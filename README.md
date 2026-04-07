@@ -94,7 +94,9 @@ Do not invent your own cryptographic primitives
 Using Windows CNG or another reputable cryptographic library is acceptable. Ad hoc or "roll your own" cryptography is not.
 
 # Required Operator Commands
+
 Filesystem
+
 ls: list directory contents
 
 cat: display file contents for a text file
@@ -109,6 +111,7 @@ download: transfer a file from implant to operator
 
 
 System Enumeration
+
 ps: enumerate running processes with at least PID and image name
 
 whoami: display the current security context of the implant
@@ -119,12 +122,14 @@ getpid: return the implant process ID
 
 
 Execution
+
 exec: execute a program or command and return output, exit status, or error information
 
 shellcodeexec: execute shellcode in either the current or another process (process injection)
 
 
 Token Manipulation
+
 inspect-token: Display information about the current token
 
 enable-privilege: Enable a specific privilege on the current token 
@@ -135,6 +140,7 @@ token-impersonate: Impersonate another process's token
 
 
 Memory and Object Inspection
+
 memread: Dump the memory of a specific process given an address and a size
 
 modulelist: List the loaded modules of a specified process (including the address it's loaded at)
@@ -143,6 +149,7 @@ handlelist: List all the handles for a given process
 
 
 Environment
+
 env: list all environment variables for the current process
 
 getenv: return the value of a named environment variable
@@ -151,6 +158,7 @@ setenv: create or modify an environment variable for the implant process
 
 
 Implant Management
+
 sleep: change the implant callback interval
 
 kill: stops the implant from running

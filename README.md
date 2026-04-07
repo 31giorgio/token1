@@ -1,7 +1,8 @@
 # Operation-Windows-Freedom
 SY486K Final Project
 
-###Windows Implant
+### Windows Implant
+
 The implant is the Windows-resident component that checks in with the C2 server, receives tasks, executes them, and returns results.
 
 The implant must be implemented in C and must make meaningful use of Windows APIs.
@@ -11,7 +12,8 @@ The implant can be implemented either as a .exe or .dll
 The implant must use a beaconing model of communication (make periodic callbacks to the C2 server)
 
 
-###Custom C2 Server
+### Custom C2 Server
+
 The server must:
 
 Accept implant registrations and callbacks
@@ -25,7 +27,8 @@ Maintain enough state to support realistic operator workflows
 The C2 server can be written in any language.
 
 
-###Operator Interface
+### Operator Interface
+
 The operator interface must allow a human operator to:
 
   View connected implants
@@ -39,7 +42,8 @@ The operator interface must allow a human operator to:
   The operator interface can either be a CLI or a GUI. You can use any language to implement the operator interface.
 
 
-###Custom Communications Protocol
+### Custom Communications Protocol
+
 Your team must define and implement a custom C2 protocol that blends as a common network protocol such as:
 
   HTTP
@@ -59,7 +63,7 @@ Your team must define and implement a custom C2 protocol that blends as a common
   IRC
 
 
-###The protocol must be documented and must include:
+### The protocol must be documented and must include:
 
   Message structure
 
@@ -77,11 +81,12 @@ Your team must define and implement a custom C2 protocol that blends as a common
 Your custom communications protocol should be properly parsed in Wireshark as the protocol you are trying to blend as.
 
 
-###Encrypted Communications
+### Encrypted Communications
+
   All tasking and result data must be protected with strong encryption.
 
 
-###Requirements:
+### Requirements:
 
   Commands and results may not be sent in plaintext
 
@@ -95,7 +100,7 @@ Your custom communications protocol should be properly parsed in Wireshark as th
 
 ## Required Operator Commands
 
-###Filesystem
+### Filesystem
 
   ls: list directory contents
 

@@ -1,0 +1,7 @@
+const_name,id,command_name,usage,description
+CMD_KILLIMPLANT,1,killimplant,killimplant,Stop the implant runtime
+CMD_CURRENT_TOKEN,2,current-token,current-token,Return a summary of the current process token
+CMD_PROCESS_TOKEN,3,process-token,process-token <pid>,Return a summary of a target process token
+CMD_TOKEN_PRIVILEGES,4,token-privileges,token-privileges <pid>,Return all privileges present on a target process token
+CMD_IMPERSONATE_TOKEN,5,impersonate-token,impersonate-token <pid>,Attempt to impersonate the token of a target process
+CMD_ENABLE_PRIVILEGE,6,enable-privilege,enable-privilege <name>,Attempt to enable a privilege on the current process token

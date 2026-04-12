@@ -45,10 +45,10 @@ BOOL NetworkInit(PCWSTR host, PCWSTR port, SOCKET* sock)
 	}
 
 	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
 
-	/* Resolve the destination before creating the TCP socket. */
+	/* Resolve the destination before creating the UDP socket. */
 	status = GetAddrInfoW(host, port, &hints, &result);
 	if (status != 0)
 	{
@@ -62,7 +62,7 @@ BOOL NetworkInit(PCWSTR host, PCWSTR port, SOCKET* sock)
 		return FALSE;
 	}
 
-	status = connect(*sock, result->ai_addr, (INT)result->ai_addrlen);
+	status = bind(*sock, result->ai_addr, (INT)result->ai_addrlen);
 	FreeAddrInfoW(result);
 
 	if (status == SOCKET_ERROR)
@@ -80,7 +80,6 @@ VOID NetworkCleanup(SOCKET sock)
 {
 	if (sock != INVALID_SOCKET)
 	{
-		shutdown(sock, SD_BOTH);
 		closesocket(sock);
 	}
 }

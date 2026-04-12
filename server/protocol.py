@@ -40,27 +40,17 @@ MESSAGE_NAMES = {
 }
 
 
-def recv_exact(sock, length):
-    data = b""
-    while len(data) < length:
-        chunk = sock.recv(length - len(data))
-        if not chunk:
-            return None
-        data += chunk
-    return data
-
-
 def encode_tlv(message_type, payload=b""):
     return struct.pack("<II", message_type, len(payload)) + payload
 
 
-def decode_tlv(sock):
-    header = recv_exact(sock, 8)
+def decode_tlv(data):
+    header = data[0:8]
     if header is None:
         return None
 
     message_type, length = struct.unpack("<II", header)
-    payload = recv_exact(sock, length) if length else b""
+    payload = data[8:]
     if payload is None:
         return None
 

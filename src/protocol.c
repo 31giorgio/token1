@@ -20,17 +20,20 @@
 static BOOL SendAll(SOCKET sock, CONST CHAR* buf, INT len)
 {
 	INT sentTotal = 0;
+	struct sockaddr_in sa = GetSockAddr();
 
 	ASSERT(sock != INVALID_SOCKET);
 	ASSERT(buf != NULL);
 
 	while (sentTotal < len)
 	{
-		INT sent = send(
+		INT sent = sendto(
 			sock,
 			buf + sentTotal,
 			len - sentTotal,
-			SOCKET_SEND_FLAGS
+			SOCKET_SEND_FLAGS,
+			(struct sockaddr*)&sa,
+			sizeof(struct sockaddr)
 		);
 		if (sent == SOCKET_ERROR)
 		{
@@ -64,11 +67,13 @@ static BOOL RecvAll(SOCKET sock, CHAR* buf, INT len)
 
 	while (recvTotal < len)
 	{
-		INT received = recv(
+		INT received = recvfrom(
 			sock,
 			buf + recvTotal,
 			len - recvTotal,
-			SOCKET_RECV_FLAGS
+			SOCKET_RECV_FLAGS,
+			NULL,
+			NULL
 		);
 		if (received <= 0)
 		{

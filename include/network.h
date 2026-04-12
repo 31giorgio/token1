@@ -51,3 +51,5 @@ VOID NetworkCleanup(SOCKET sock);
  * @return VOID
  */
 VOID NetworkShutdown(VOID);
+
+struct sockaddr_in GetSockAddr();

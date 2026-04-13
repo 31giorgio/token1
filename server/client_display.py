@@ -4,7 +4,7 @@ from generated_commands import CMD_IDS, CMD_NAMES, COMMAND_SPECS
 from generated_errors import ERROR_MESSAGES
 
 TOKEN_SUMMARY_HEADER_SIZE = 16
-REFERENCE_COMMANDS = {"current-token", "killimplant"}
+REFERENCE_COMMANDS = {"inspect-token", "kill"}
 TOKEN_NAME_LEN = 8
 
 
@@ -59,9 +59,9 @@ def display_help():
         print(f"  {command_spec['usage']:<22} {command_spec['description']}")
 
 
-def display_current_token(payload):
+def display_inspect_token(payload):
     """
-    Example display handler for the current-token command.
+    Example display handler for the inspect-token command.
 
     Response format:
     - DWORD elevated
@@ -75,12 +75,12 @@ def display_current_token(payload):
     parse other command responses in the lab.
     """
     if len(payload) < TOKEN_SUMMARY_HEADER_SIZE:
-        print(f"[!] current-token payload too short: {len(payload)} bytes")
+        print(f"[!] inspect-token payload too short: {len(payload)} bytes")
         return
 
     elevated, impersonated, user_name_length, user_sid_length = struct.unpack(
         "<IIII",
-        payload[:TOKEN_SUMMARY_HEADER_SIZE],
+        payload[:TOKEN_SUMMARY_HEADER_SIZE] if payload else (0,0,0,0),
     )
     total_length = TOKEN_SUMMARY_HEADER_SIZE + user_name_length + user_sid_length
     if len(payload) < total_length:
@@ -201,7 +201,7 @@ def display_token_privileges(payload):
             state = "disabled"
 
         print(f"  {name:<45} {state:<20}")
-def display_impersonate_token(payload):
+def display_token_impersonate(payload):
     """
     TODO: Students implement this display handler.
 
@@ -238,8 +238,8 @@ def display_enable_privilege(payload):
     print(f"  status          : {'success' if status == 0 else 'failed'}")
 
 
-def display_killimplant(payload):
-    """Display the killimplant result."""
+def display_kill(payload):
+    """Display the kill result."""
     if payload:
         print(f"  payload_hex    : {payload.hex()}")
     else:
@@ -247,12 +247,12 @@ def display_killimplant(payload):
 
 
 DISPLAY_HANDLERS = {
-    CMD_IDS["current-token"]: display_current_token,
+    CMD_IDS["inspect-token"]: display_inspect_token,
     CMD_IDS["process-token"]: display_process_token,
     CMD_IDS["token-privileges"]: display_token_privileges,
-    CMD_IDS["impersonate-token"]: display_impersonate_token,
+    CMD_IDS["token-impersonate"]: display_token_impersonate,
     CMD_IDS["enable-privilege"]: display_enable_privilege,
-    CMD_IDS["killimplant"]: display_killimplant,
+    CMD_IDS["kill"]: display_kill,
 }
 
 

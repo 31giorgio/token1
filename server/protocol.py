@@ -65,3 +65,7 @@ def decode_tlv(sock):
         return None
 
     return message_type, payload
+
+def encrypt_payload(payload):
+    # Placeholder for encryption logic
+    return payload

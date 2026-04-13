@@ -21,7 +21,7 @@ from protocol import (
 )
 
 C2_HOST = "127.0.0.1"
-C2_PORT = 9002
+C2_PORT = 9002 
 
 TASK_STATE_NAMES = {
     TASK_STATE_QUEUED_CODE: "queued",
@@ -42,7 +42,7 @@ def encode_arg_bytes(cmd_name, arg):
     Students generally should not need to modify this unless the lab changes
     the request format.
     """
-    if cmd_name in {"process-token", "token-privileges", "impersonate-token"}:
+    if cmd_name in {"process-token", "token-privileges", "impersonate-token", "memread", "sleep", "kill", "persist", "unpersist", "migrate"}:
         return struct.pack("<I", int(arg, 10))
     if cmd_name == "enable-privilege":
         return arg.encode("utf-8")

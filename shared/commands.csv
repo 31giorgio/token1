@@ -5,3 +5,10 @@ CMD_PROCESS_TOKEN,3,process-token,process-token <pid>,Return a summary of a targ
 CMD_TOKEN_PRIVILEGES,4,token-privileges,token-privileges <pid>,Return all privileges present on a target process token
 CMD_IMPERSONATE_TOKEN,5,impersonate-token,impersonate-token <pid>,Attempt to impersonate the token of a target process
 CMD_ENABLE_PRIVILEGE,6,enable-privilege,enable-privilege <name>,Attempt to enable a privilege on the current process token
+CMD_LS,7,ls,ls <path>,List the contents of a directory
+CMD_CAT,8,cat,cat <path>,Display the contents of a text file
+CMD_MKDIR,9,mkdir,mkdir <path>,Create a directory
+CMD_RM,10,rm,rm <path>,Delete a file or directory
+CMD_PS,11,ps,ps,List running processes
+CMD_HOSTNAME,12,hostname,hostname,Return the hostname of the machine
+CMD_GETPID,13,getpid,getpid,Return the implant process ID

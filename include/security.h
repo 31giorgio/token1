@@ -79,3 +79,55 @@ DWORD ImpersonateProcessToken(DWORD processId, PBYTE* responseData, DWORD* respo
  * @return A numeric error or success code.
  */
 DWORD EnableCurrentTokenPrivilege(PCWSTR privilegeName, PBYTE* responseData, DWORD* responseLen);
+
+/**
+ * @brief Lists the contents of a directory at the given path.
+ *
+ * @param path Null-terminated UTF-16LE absolute path to enumerate.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD ListDirectory(
+	PCWSTR path,
+	PBYTE* responseData,
+	DWORD* responseLen
+);
+
+/**
+ * @brief Reads the contents of a file and returns them as raw bytes.
+ *
+ * @param path Null-terminated UTF-16LE absolute path to the file.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD ReadFileContents(
+	PCWSTR path,
+	PBYTE* responseData,
+	DWORD* responseLen
+);
+
+/**
+ * @brief Creates a directory at the specified path.
+ *
+ * @param path Null-terminated UTF-16LE absolute path to create.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD CreateDirectory_(
+	PCWSTR path
+);
+
+/**
+ * @brief Deletes a file or recursively deletes a directory.
+ *
+ * @param path Null-terminated UTF-16LE absolute path to remove.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD DeletePath(
+	PCWSTR path
+);

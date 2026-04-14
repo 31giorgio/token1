@@ -4,19 +4,19 @@
 #define UTF8_WIDE_NULL_TERMINATOR_COUNT 1U
 
 CONST COMMAND_MAP G_CommandTable[] = {
-	{ CMD_KILLIMPLANT,       CmdKillImplant },
-	{ CMD_CURRENT_TOKEN,     CmdCurrentToken },
-	{ CMD_PROCESS_TOKEN,     CmdProcessToken },
-	{ CMD_TOKEN_PRIVILEGES,  CmdTokenPrivileges },
-	{ CMD_IMPERSONATE_TOKEN, CmdImpersonateToken },
-	{ CMD_ENABLE_PRIVILEGE,  CmdEnablePrivilege },
-	{ CMD_LS,                CmdLs },
-	{ CMD_CAT,               CmdCat },
-	{ CMD_MKDIR,             CmdMkdir },
-	{ CMD_RM,                CmdRm },
-	{ CMD_PS,                CmdPs },
-	{ CMD_HOSTNAME,          CmdHostname },
-	{ CMD_GETPID,            CmdGetPid }
+	{ CMD_KILL,               CmdKillImplant },
+	{ CMD_INSPECT_TOKEN,      CmdCurrentToken },
+	{ CMD_PROCESS_TOKEN,      CmdProcessToken },
+	{ CMD_TOKEN_PRIVILEGES,   CmdTokenPrivileges },
+	{ CMD_TOKEN_IMPERSONATE,  CmdImpersonateToken },
+	{ CMD_ENABLE_PRIVILEGE,   CmdEnablePrivilege },
+	{ CMD_LS,                 CmdLs },
+	{ CMD_CAT,                CmdCat },
+	{ CMD_MKDIR,              CmdMkdir },
+	{ CMD_RM,                 CmdRm },
+	{ CMD_PS,                 CmdPs },
+	{ CMD_HOSTNAME,           CmdHostname },
+	{ CMD_GETPID,             CmdGetPid }
 };
 
 static DWORD ConvertUtf8ToWideString(

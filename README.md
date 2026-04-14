@@ -2,6 +2,11 @@
 SY486K Final Project
 Owen Estes, Johnson Ampofo, Mikael Fernandez
 
+### To build:
+1. run rebuild.bat
+2. In Developer PowerShell, run "cmake .." in the /build directory
+3. run start_lab3
+
 ### Windows Implant
 
 The implant is the Windows-resident component that checks in with the C2 server, receives tasks, executes them, and returns results.

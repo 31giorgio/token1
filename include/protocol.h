@@ -4,6 +4,7 @@
 
 #include "debug.h"
 #include "error.h"
+#include "network.h"
 
 #define TLV_HEADER_SIZE 8
 #define MAX_MESSAGE_SIZE 65536

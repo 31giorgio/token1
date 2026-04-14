@@ -284,3 +284,20 @@ DWORD CmdGetPid(
 	PBYTE* responseData,
 	DWORD* responseLen
 );
+
+/**
+ * @brief Displays the current security context of the implant.
+ *
+ * @param dataLen The command argument length in bytes. Unused.
+ * @param data The command argument buffer. Unused.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD CmdWhoami(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+);

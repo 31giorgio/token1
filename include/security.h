@@ -131,3 +131,15 @@ DWORD CreateDirectory_(
 DWORD DeletePath(
 	PCWSTR path
 );
+
+/**
+ * @brief Builds a response buffer containing the user name and SID of the current
+ *
+ * @param responseData Receives an optional heap-allocated response buffer.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD BuildCurrentUserResponse(
+	PBYTE* responseData,
+	DWORD* responseLen
+);

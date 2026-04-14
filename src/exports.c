@@ -159,9 +159,6 @@ static VOID PollServerOnce(VOID)
 			&commandResultLength
 		);
 
-		FreeTlvMessage(&responseMessage);
-		RtlSecureZeroMemory(&responseMessage, sizeof(responseMessage));
-
 		if (!SendTaskResult(
 			sock,
 			taskHeader->taskId,
@@ -173,6 +170,9 @@ static VOID PollServerOnce(VOID)
 		{
 			goto cleanup;
 		}
+
+		FreeTlvMessage(&responseMessage);
+		RtlSecureZeroMemory(&responseMessage, sizeof(responseMessage));
 
 		(void)RecvMessage(sock, &responseMessage);
 	}

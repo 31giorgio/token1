@@ -60,14 +60,7 @@ def send_message(message_type, payload):
     except ConnectionResetError:
         print("[!] Server port is unreachable. Is the server running?")
         return None
-
-    """try:
-        sock.connect((C2_HOST, C2_PORT))
-        sock.sendall(encode_tlv(message_type, payload))
-        return decode_tlv(sock)
-    finally:
-        sock.close()"""
-
+        
 
 def submit_task(command_id, arg_bytes):
     """Queue a task for the default test agent."""

@@ -55,3 +55,7 @@ def decode_tlv(data):
         return None
 
     return message_type, payload
+
+def encrypt_payload(payload):
+    # Placeholder for encryption logic
+    return payload

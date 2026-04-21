@@ -10,8 +10,7 @@
 #include "network.h"
 
 #define TLV_HEADER_SIZE 8
-//Max DNS message length + DNS header size
-#define MAX_MESSAGE_SIZE 524
+#define MAX_MESSAGE_SIZE 65536
 #define DNS_HEADER_SIZE 12
 #define DNS_FLAGS_OFFSET 2
 #define DNS_LENGTH_OFFSET 4
@@ -100,7 +99,7 @@ VOID FreeTlvMessage(TLV_MESSAGE* msg);
 
 BOOL EncodeDNS(PBYTE* msg, USHORT taskId, DWORD type, DWORD* payloadLength, PBYTE payload);
 
-//BOOL DecodeDNS(PBYTE msg, DWORD type, DWORD payloadLength, CONST PBYTE payload);
+BOOL DecodeDNS(PBYTE msg, PBYTE* out);
 
 BOOL Encrypt(PBYTE* msg, DWORD msgLength);
 

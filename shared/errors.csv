@@ -28,3 +28,5 @@ ERROR_DIRECTORY_ALREADY_EXISTS,0x4000001A,Directory already exists
 ERROR_DELETE_PATH_FAILED,0x4000001B,Failed to delete path
 ERROR_LIST_PROCESSES_FAILED,0x4000001C,Failed to list processes
 ERROR_GET_HOSTNAME_FAILED,0x4000001D,Failed to get hostname
+ERROR_GET_ENV_FAILED,0x4000001E,Failed to get environment details
+ERROR_EXEC_FAILED,0x4000001F,Failed to execute

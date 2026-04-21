@@ -143,3 +143,17 @@ DWORD BuildCurrentUserResponse(
 	PBYTE* responseData,
 	DWORD* responseLen
 );
+
+/**
+ * @brief return the value of a named environment variable
+ *
+ * @param responseData Receives an optional heap-allocated response buffer
+ *
+ * @return A numeric error or success code.
+ */
+
+DWORD GetEnvironmentBlock(
+	PBYTE* responseData,
+	DWORD* responseLen
+);
+

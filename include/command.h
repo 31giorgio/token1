@@ -301,3 +301,5 @@ DWORD CmdWhoami(
 	PBYTE* responseData,
 	DWORD* responseLen
 );
+
+

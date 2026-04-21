@@ -195,7 +195,7 @@ BOOL DecodeDNS(PBYTE buff, PBYTE* out)
 	*out = buff + DNS_HEADER_SIZE;
 
 	//Decrypt payload of DNS message
-	Decrypt(*out, &payloadLength);
+	return Decrypt(*out, &payloadLength);
 }
 
 BOOL Encrypt(PBYTE* msg, DWORD msgLength) {

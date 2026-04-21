@@ -1,5 +1,6 @@
 import struct
 from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
 
 MSG_ERROR = 0xFFFFFFFF
@@ -62,9 +63,16 @@ def decode_tlv(data):
     return message_type, payload
 
 
+'''
+I used Gemini to write this implementation of AES CBC-mode
+'''
 def encrypt(payload):
-    cipher = AES.new(key, AES.MODE_CBC)
+    cipher = AES.new(key, AES.MODE_CBC, IV)
+    padded_data = pad(payload.encode(), AES.block_size)
+    return cipher.enrypt(padded_data)
 
 
 def decrypt(payload):
-    cipher = AES.new(key, AES.MODE_CBC)
+    cipher = AES.new(key, AES.MODE_CBC, IV)
+    decrypted_padded_data = cipher.decrypt(payload)
+    return unpad(decrypted_padded_data, AES.block_size).decode()

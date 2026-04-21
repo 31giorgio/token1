@@ -2,6 +2,7 @@
 #include <WinSock2.h>
 #include <Windows.h>
 #include <stdlib.h>
+#include <bcrypt.h>
 
 #include "debug.h"
 #include "error.h"
@@ -16,6 +17,8 @@
 #define DNS_ANSWER_OFFSET 6
 #define DNS_AUTHORITY_OFFSET 8
 #define DNS_ADDITIONAL_OFFSET 10
+#define KEY_SIZE 32
+#define KEY_BUFF_SIZE 44
 
 #define MSG_AGENT_GET_TASK 0x1001
 #define MSG_AGENT_POST_RESULT 0x1002
@@ -93,6 +96,10 @@ BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg);
  */
 VOID FreeTlvMessage(TLV_MESSAGE* msg);
 
-BOOL EncodeDNS(PBYTE msg, USHORT taskId, DWORD type, DWORD* payloadLength, CONST PBYTE payload);
+BOOL EncodeDNS(PBYTE* msg, USHORT taskId, DWORD type, DWORD* payloadLength, PBYTE payload);
 
 //BOOL DecodeDNS(PBYTE msg, DWORD type, DWORD payloadLength, CONST PBYTE payload);
+
+BOOL Encrypt(PBYTE* msg, DWORD msgLength);
+
+//BOOL Decrypt(PBYTE msg);

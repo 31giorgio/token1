@@ -1,4 +1,6 @@
 #include "network.h"
+#include <wchar.h>
+#include <stdlib.h>
 
 #define WINSOCK_VERSION_MAJOR 2
 #define WINSOCK_VERSION_MINOR 2

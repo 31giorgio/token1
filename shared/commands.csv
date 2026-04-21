@@ -1,7 +1,30 @@
 const_name,id,command_name,usage,description
-CMD_KILLIMPLANT,1,killimplant,killimplant,Stop the implant runtime
-CMD_CURRENT_TOKEN,2,current-token,current-token,Return a summary of the current process token
+CMD_KILL,1,kill,kill,Stop the implant runtime
+CMD_INSPECT_TOKEN,2,inspect-token,inspect-token,Display information about the current token
 CMD_PROCESS_TOKEN,3,process-token,process-token <pid>,Return a summary of a target process token
 CMD_TOKEN_PRIVILEGES,4,token-privileges,token-privileges <pid>,Return all privileges present on a target process token
-CMD_IMPERSONATE_TOKEN,5,impersonate-token,impersonate-token <pid>,Attempt to impersonate the token of a target process
-CMD_ENABLE_PRIVILEGE,6,enable-privilege,enable-privilege <name>,Attempt to enable a privilege on the current process token
+CMD_TOKEN_IMPERSONATE,5,token-impersonate,token-impersonate <pid>,Attempt to impersonate the token of another process
+CMD_ENABLE_PRIVILEGE,6,enable-privilege,enable-privilege <name>,Attempt to enable a privilege on the current token
+CMD_LS,7,ls,ls [path],List directory contents
+CMD_CAT,8,cat,cat <file>,Display file contents
+CMD_MKDIR,9,mkdir,mkdir <folder>,Create a new folder
+CMD_RM,10,rm,rm <file/folder>,Remove an empty folder or file
+CMD_UPLOAD,11,upload,upload <local> <remote>,Upload a file to the implant
+CMD_DOWNLOAD,12,download,download <remote> <local>,Download a file from the implant
+CMD_PS,13,ps,ps,List running processes
+CMD_WHOAMI,14,whoami,whoami,Display the current security context of the implant
+CMD_HOSTNAME,15,hostname,hostname,Return the host or computer name
+CMD_GETPID,16,getpid,getpid,Return the implant process ID
+CMD_EXEC,17,exec,exec <cmd>,Execute a program or command
+CMD_SHELLCODEEXEC,18,shellcodeexec,shellcodeexec <path>,Execute raw shellcode from a file
+CMD_DISABLE_PRIVILEGE,19,disable-privilege,disable-privilege <name>,Attempt to disable a privilege on the current token
+CMD_MEMREAD,20,memread,memread <addr> <size>,Dump memory of a process
+CMD_MODULELIST,21,modulelist,modulelist <pid>,List loaded modules of a process
+CMD_HANDLELIST,22,handlelist,handlelist <pid>,List all handles for a given process
+CMD_ENV,23,env,env,List all environment variables
+CMD_GETENV,24,getenv,getenv <var>,Return value of an environment variable
+CMD_SETENV,25,setenv,setenv <var> <val>,Create or modify an environment variable
+CMD_SLEEP,26,sleep,sleep <interval>,Change the implant callback interval
+CMD_PERSIST,27,persist,persist,Install persistence on the target
+CMD_UNPERSIST,28,unpersist,unpersist,Removes the persistence on the target
+CMD_MIGRATE,29,migrate,migrate <pid>,Inject the implant into another process

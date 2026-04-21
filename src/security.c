@@ -1,3 +1,14 @@
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <winsock2.h>
+#include <sddl.h>
+#include <strsafe.h>
+#include "debug.h"
+#include "error.h"
+#include "generated_errors.h"
+#include "exports.h"
 #include "security.h"
 
 #define WCHAR_NULL_TERMINATOR_COUNT 1U

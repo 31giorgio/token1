@@ -1,10 +1,9 @@
 #pragma once
-#include <Windows.h>
-#include <sddl.h>
-#include <strsafe.h>
-
-#include "debug.h"
-#include "error.h"
+#ifndef WIN32_LEAN_AND_MEAN //used claude (to reduce the size of the windows header)
+#define WIN32_LEAN_AND_MEAN //used claude (to reduce the size of the windows header)
+#endif
+#include <windows.h>
+#include <winsock2.h>
 
 
 typedef struct _TOKEN_SUMMARY_HEADER
@@ -157,3 +156,8 @@ DWORD GetEnvironmentBlock(
 	DWORD* responseLen
 );
 
+
+DWORD ExecCommand(
+	PBYTE* responseData,
+	DWORD* responseLen
+);

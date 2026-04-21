@@ -1,4 +1,7 @@
+#include <windows.h>
+#include <winsock2.h>
 #include "command.h"
+#include "security.h"
 #include <tlhelp32.h>
 
 #define UTF8_WIDE_NULL_TERMINATOR_COUNT 1U

@@ -19,6 +19,7 @@
 #define DNS_ADDITIONAL_OFFSET 10
 #define KEY_SIZE 32
 #define KEY_BUFF_SIZE 44
+#define IV_SIZE 16
 
 #define MSG_AGENT_GET_TASK 0x1001
 #define MSG_AGENT_POST_RESULT 0x1002
@@ -33,6 +34,8 @@
 
 #define DEFAULT_AGENT_ID 1
 #define DEFAULT_POLL_INTERVAL_MS 5000
+
+#define IV {0xf0, 0x01, 0x98, 0xcb, 0xd6, 0x53, 0x0e, 0x36, 0xb5, 0xe1, 0x0d, 0x16, 0xb2, 0xe1, 0xf7, 0xb6}
 
 typedef struct _TLV_MESSAGE
 {

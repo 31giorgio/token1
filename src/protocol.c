@@ -192,11 +192,7 @@ BOOL Encrypt(PBYTE* msg, DWORD msgLength) {
 	BCRYPT_ALG_HANDLE hAlg = NULL;
 	BCRYPT_KEY_HANDLE hKey = NULL;
 	NTSTATUS status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_AES_ALGORITHM, NULL, 0);
-	BYTE pbKey[KEY_SIZE];
-	DWORD cbKey = KEY_SIZE;
 	PBYTE buff = ImplantHeapAlloc(KEY_BUFF_SIZE);
-	DWORD cbCiphertext = 0;
-	DWORD cbDataRet = 0;
 	PBYTE temp = *msg;
 	ULONG sizeRequired = 0;
 	HANDLE keyFile = NULL;
@@ -247,6 +243,49 @@ BOOL Encrypt(PBYTE* msg, DWORD msgLength) {
 		return FALSE;
 	}
 	ImplantHeapFree(temp);
+
+	return TRUE;
+}
+
+BOOL Decrypt(PBYTE msg, DWORD* msgLength) {
+	NTSTATUS status;
+	BCRYPT_ALG_HANDLE hAlg = NULL;
+	BCRYPT_KEY_HANDLE hKey = NULL;
+	PBYTE buff = ImplantHeapAlloc(KEY_BUFF_SIZE);
+	ULONG sizeRequired = 0;
+	HANDLE keyFile = NULL;
+
+	if (!ReadFile(keyFile, buff, KEY_BUFF_SIZE, NULL, NULL))
+	{
+		ImplantHeapFree(buff);
+		return FALSE;
+	}
+
+	status = BCryptImportKey(hAlg, NULL, BCRYPT_KEY_DATA_BLOB, hKey, NULL, 0, buff, KEY_BUFF_SIZE, 0);
+	if (status != STATUS_SUCCESS)
+	{
+		ImplantHeapFree(buff);
+		return FALSE;
+	}
+
+	status = BCryptDecrypt(hKey, msg, *msgLength, NULL, NULL, 0, NULL, 0, &sizeRequired, 0);
+	if (status != STATUS_SUCCESS)
+	{
+		ImplantHeapFree(buff);
+		return FALSE;
+	}
+
+	if (sizeRequired <= *msgLength)
+	{
+
+		status = BCryptDecrypt(hKey, msg, *msgLength, NULL, NULL, 0, msg, sizeRequired, &sizeRequired, 0);
+		if (status != STATUS_SUCCESS)
+		{
+			ImplantHeapFree(buff);
+			return FALSE;
+		}
+		*msgLength = sizeRequired;
+	}
 
 	return TRUE;
 }

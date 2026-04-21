@@ -100,10 +100,52 @@ BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg);
  */
 VOID FreeTlvMessage(TLV_MESSAGE* msg);
 
+/**
+* @brief encodes a TLV message as DNS and encrypts the body
+* 
+* @param msg The msg to be masked
+* 
+* @param taskId The identifier assigned to the relevant task
+* 
+* @param type The type of message or task to send
+* 
+* @param payloadLength The length of the payload to encode
+* 
+* @param payload The payload to encode
+* 
+* @return TRUE on success, FALSE on failure
+*/
 BOOL EncodeDNS(PBYTE* msg, USHORT taskId, DWORD type, DWORD* payloadLength, PBYTE payload);
 
+/**
+* @brief decodes a DNS-masked message to TLV format
+* 
+* @param msg The DNS-masked message to decode
+* 
+* @param out The output buffer
+* 
+* @return TRUE on success, FALSE on failure
+*/
 BOOL DecodeDNS(PBYTE msg, PBYTE* out);
 
+/**
+* @brief Encrypts a message using AES CBC-mode
+* 
+* @param msg The message to be encrypted
+* 
+* @param msgLength The length of the message
+* 
+* @return TRUE on success, FALSE on failure
+*/
 BOOL Encrypt(PBYTE* msg, DWORD msgLength);
 
+/**
+* @brief Decrypts a message using AES CBC-mode
+* 
+* @param msg The message to be encrypted
+* 
+* @param msgLength The length of the message
+* 
+* @return TRUE on success, FALSE on failure
+*/
 BOOL Decrypt(PBYTE msg, DWORD* msgLength);

@@ -192,6 +192,7 @@ BOOL DecodeDNS(PBYTE buff, PBYTE* out)
 	return Decrypt(*out, &payloadLength);
 }
 
+//I used Gemini to write the Encrypt and Decrypt() functions
 BOOL Encrypt(PBYTE* msg, DWORD msgLength) {
 	BCRYPT_ALG_HANDLE hAlg = NULL;
 	BCRYPT_KEY_HANDLE hKey = NULL;

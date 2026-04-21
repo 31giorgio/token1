@@ -2,6 +2,7 @@ import struct
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
+import os
 
 MSG_ERROR = 0xFFFFFFFF
 
@@ -25,6 +26,7 @@ TASK_STATE_QUEUED_CODE = 1
 TASK_STATE_LEASED_CODE = 2
 TASK_STATE_COMPLETED_CODE = 3
 
+keyFile = "C:\\Users\\m271764\\sy486k\\Operation-Windows-Freedom\\server\\key.bin"
 IV = b"\xf0\x01\x98\xcb\xd6\x53\x0e\x36\xb5\xe1\x0d\x16\xb2\xe1\xf7\xb6"
 
 MESSAGE_NAMES = {
@@ -49,7 +51,7 @@ def encode_tlv(message_type, payload=b""):
     payload = struct.pack("<II", message_type, len(payload)) + payload
     payload = encrypt(payload)
     payload = struct.pack("<HHHHHH", 0, 0, len(payload), 0, 0, 0) + payload
-
+    return payload
 
 def decode_tlv(data):
     data = decrypt(data[12:])
@@ -69,12 +71,16 @@ def decode_tlv(data):
 I used Gemini to write this implementation of AES CBC-mode
 '''
 def encrypt(payload):
+    with open(keyFile, 'rb') as f:
+        key = f.readlines()[0][-32:]
     cipher = AES.new(key, AES.MODE_CBC, IV)
-    padded_data = pad(payload.encode(), AES.block_size)
-    return cipher.enrypt(padded_data)
+    padded_data = pad(payload, AES.block_size)
+    return cipher.encrypt(padded_data)
 
 
 def decrypt(payload):
+    with open(keyFile, 'rb') as f:
+        key = f.readlines()[0][-32:]
     cipher = AES.new(key, AES.MODE_CBC, IV)
     decrypted_padded_data = cipher.decrypt(payload)
-    return unpad(decrypted_padded_data, AES.block_size).decode()
+    return unpad(decrypted_padded_data, AES.block_size)

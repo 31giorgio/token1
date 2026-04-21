@@ -126,7 +126,7 @@ BOOL EncodeDNS(PBYTE* msg, USHORT taskId, DWORD type, DWORD* payloadLength, PBYT
 * 
 * @return TRUE on success, FALSE on failure
 */
-BOOL DecodeDNS(PBYTE msg, PBYTE* out);
+BOOL DecodeDNS(PBYTE buff, PBYTE* out);
 
 /**
 * @brief Encrypts a message using AES CBC-mode

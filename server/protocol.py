@@ -26,8 +26,7 @@ TASK_STATE_QUEUED_CODE = 1
 TASK_STATE_LEASED_CODE = 2
 TASK_STATE_COMPLETED_CODE = 3
 
-PROTOCOL_DIR = os.path.dirname(os.path.abspath(__file__))
-keyFile = os.path.join(PROTOCOL_DIR, "..", "key.bin")
+key = b"\x32\x00\x90\xf1\xe1\x56\xeb\xa2\x38\x72\x60\x9b\xf3\x0c\x70\x98\xd9\xba\xeb\xaa\x16\xd4\xc0\x13\xfe\x73\xbd\xbc\x67\x3e\x3e\xed"
 IV = b"\xf0\x01\x98\xcb\xd6\x53\x0e\x36\xb5\xe1\x0d\x16\xb2\xe1\xf7\xb6"
 
 MESSAGE_NAMES = {
@@ -72,16 +71,12 @@ def decode_tlv(data):
 I used Gemini to write this implementation of AES CBC-mode
 '''
 def encrypt(payload):
-    with open(keyFile, 'rb') as f:
-        key = f.readlines()[0][-32:]
     cipher = AES.new(key, AES.MODE_CBC, IV)
     padded_data = pad(payload, AES.block_size)
     return cipher.encrypt(padded_data)
 
 
 def decrypt(payload):
-    with open(keyFile, 'rb') as f:
-        key = f.readlines()[0][-32:]
     cipher = AES.new(key, AES.MODE_CBC, IV)
     decrypted_padded_data = cipher.decrypt(payload)
     return unpad(decrypted_padded_data, AES.block_size)

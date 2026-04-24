@@ -52,4 +52,9 @@ VOID NetworkCleanup(SOCKET sock);
  */
 VOID NetworkShutdown(VOID);
 
+/**
+* @brief Exports a sockaddr structure to the caller
+* 
+* @return sockaddr_in structure initialized with defined address and port
+*/
 struct sockaddr_in GetSockAddr();

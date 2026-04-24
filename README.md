@@ -1,7 +1,8 @@
 # Operation-Windows-Freedom
 SY486K Final Project
 
-Windows Implant
+### Windows Implant
+
 The implant is the Windows-resident component that checks in with the C2 server, receives tasks, executes them, and returns results.
 
 The implant must be implemented in C and must make meaningful use of Windows APIs.
@@ -11,7 +12,8 @@ The implant can be implemented either as a .exe or .dll
 The implant must use a beaconing model of communication (make periodic callbacks to the C2 server)
 
 
-Custom C2 Server
+### Custom C2 Server
+
 The server must:
 
 Accept implant registrations and callbacks
@@ -25,146 +27,149 @@ Maintain enough state to support realistic operator workflows
 The C2 server can be written in any language.
 
 
-Operator Interface
+### Operator Interface
+
 The operator interface must allow a human operator to:
 
-View connected implants
+  View connected implants
 
-Issue tasks
+  Issue tasks
 
-Inspect returned results
+  Inspect returned results
 
-Distinguish success, failure, and partial failure cases
+  Distinguish success, failure, and partial failure cases
 
-The operator interface can either be a CLI or a GUI. You can use any language to implement the operator interface.
+  The operator interface can either be a CLI or a GUI. You can use any language to implement the operator interface.
 
 
-Custom Communications Protocol
+### Custom Communications Protocol
+
 Your team must define and implement a custom C2 protocol that blends as a common network protocol such as:
 
-HTTP
+  HTTP
 
-HTTPS
+  HTTPS
 
-DNS
+  DNS
 
-RTP
+  RTP
 
-QUIC
+  QUIC
 
-ICMP
+  ICMP
 
-SMTP
+  SMTP
 
-IRC
+  IRC
 
 
-The protocol must be documented and must include:
+### The protocol must be documented and must include:
 
-Message structure
+  Message structure
 
-Tasking format
+  Tasking format
 
-Result format
+  Result format
 
-Identifiers and metadata
+  Identifiers and metadata
 
-Error handling behavior
+  Error handling behavior
 
-Session or host tracking design
+  Session or host tracking design
 
 
 Your custom communications protocol should be properly parsed in Wireshark as the protocol you are trying to blend as.
 
 
-Encrypted Communications
-All tasking and result data must be protected with strong encryption.
+### Encrypted Communications
+
+  All tasking and result data must be protected with strong encryption.
 
 
-Requirements:
+### Requirements:
 
-commands and results may not be sent in plaintext
+  Commands and results may not be sent in plaintext
 
-Integrity protection must be provided
+  Integrity protection must be provided
 
-Keying material and session setup must be documented
+  Keying material and session setup must be documented
 
-Do not invent your own cryptographic primitives
+  Do not invent your own cryptographic primitives
 
-Using Windows CNG or another reputable cryptographic library is acceptable. Ad hoc or "roll your own" cryptography is not.
+  Using Windows CNG or another reputable cryptographic library is acceptable. Ad hoc or "roll your own" cryptography is not.
 
-# Required Operator Commands
+## Required Operator Commands
 
-Filesystem
+### Filesystem
 
-ls: list directory contents
+  ls: list directory contents
 
-cat: display file contents for a text file
+  cat: display file contents for a text file
 
-mkdir: create a directory
+  mkdir: create a directory
 
-rm: delete a file or directory with clear failure reporting
+  rm: delete a file or directory with clear failure reporting
 
-upload: transfer a file from operator to implant
+  upload: transfer a file from operator to implant
 
-download: transfer a file from implant to operator
-
-
-System Enumeration
-
-ps: enumerate running processes with at least PID and image name
-
-whoami: display the current security context of the implant
-
-hostname: return the host or computer name
-
-getpid: return the implant process ID
+  download: transfer a file from implant to operator
 
 
-Execution
+###System Enumeration
 
-exec: execute a program or command and return output, exit status, or error information
+  ps: enumerate running processes with at least PID and image name
 
-shellcodeexec: execute shellcode in either the current or another process (process injection)
+  whoami: display the current security context of the implant
 
+  hostname: return the host or computer name
 
-Token Manipulation
-
-inspect-token: Display information about the current token
-
-enable-privilege: Enable a specific privilege on the current token 
-
-disable-privilege: Disable a specific privilege on the current token
-
-token-impersonate: Impersonate another process's token
+  getpid: return the implant process ID
 
 
-Memory and Object Inspection
+###Execution
 
-memread: Dump the memory of a specific process given an address and a size
+  exec: execute a program or command and return output, exit status, or error information
 
-modulelist: List the loaded modules of a specified process (including the address it's loaded at)
-
-handlelist: List all the handles for a given process
+  shellcodeexec: execute shellcode in either the current or another process (process injection)
 
 
-Environment
+###Token Manipulation
 
-env: list all environment variables for the current process
+  inspect-token: Display information about the current token
 
-getenv: return the value of a named environment variable
+  enable-privilege: Enable a specific privilege on the current token 
 
-setenv: create or modify an environment variable for the implant process
+  disable-privilege: Disable a specific privilege on the current token
+
+  token-impersonate: Impersonate another process's token
 
 
-Implant Management
+###Memory and Object Inspection
 
-sleep: change the implant callback interval
+  memread: Dump the memory of a specific process given an address and a size
 
-kill: stops the implant from running
+  modulelist: List the loaded modules of a specified process (including the address it's loaded at)
 
-persist: install persistence on the target
+  handlelist: List all the handles for a given process
 
-unpersist: removes the persistence on the target
 
-migrate: inject the implant into another process
+###Environment
+
+  env: list all environment variables for the current process
+
+  getenv: return the value of a named environment variable
+
+  setenv: create or modify an environment variable for the implant process
+
+
+###Implant Management
+
+  sleep: change the implant callback interval
+
+  kill: stops the implant from running
+
+  persist: install persistence on the target
+
+  unpersist: removes the persistence on the target
+
+  migrate: inject the implant into another process

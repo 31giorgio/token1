@@ -45,7 +45,7 @@ ERROR_MESSAGES = {
     ERROR_GET_TOKEN_INFORMATION_FAILED: 'Failed to get token information',
     ERROR_DUPLICATE_TOKEN_FAILED: 'Failed to duplicate token',
     ERROR_IMPERSONATE_FAILED: 'Failed to impersonate client',
-    ERROR_LOOKUP_PRIVILEGE_VALUE_FAILED: 'Failed to lookup privilege value',
+    ERROR_LOOKUP_PRIVILEGE_VALUE_FAILED: 'Failed to lookup privilege name',
     ERROR_ADJUST_TOKEN_PRIVILEGES_FAILED: 'Failed to adjust token privileges',
     ERROR_FILE_NOT_FOUND: 'File not found',
     ERROR_ACCESS_DENIED: 'Access denied',

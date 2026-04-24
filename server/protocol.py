@@ -1,4 +1,8 @@
 import struct
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+from Crypto.Random import get_random_bytes
+import os
 
 MSG_ERROR = 0xFFFFFFFF
 
@@ -22,6 +26,10 @@ TASK_STATE_QUEUED_CODE = 1
 TASK_STATE_LEASED_CODE = 2
 TASK_STATE_COMPLETED_CODE = 3
 
+PROTOCOL_DIR = os.path.dirname(os.path.abspath(__file__))
+keyFile = os.path.join(PROTOCOL_DIR, "..", "key.bin")
+IV = b"\xf0\x01\x98\xcb\xd6\x53\x0e\x36\xb5\xe1\x0d\x16\xb2\xe1\xf7\xb6"
+
 MESSAGE_NAMES = {
     MSG_ERROR: "MSG_ERROR",
     MSG_AGENT_GET_TASK: "MSG_AGENT_GET_TASK",
@@ -40,32 +48,40 @@ MESSAGE_NAMES = {
 }
 
 
-def recv_exact(sock, length):
-    data = b""
-    while len(data) < length:
-        chunk = sock.recv(length - len(data))
-        if not chunk:
-            return None
-        data += chunk
-    return data
-
-
 def encode_tlv(message_type, payload=b""):
-    return struct.pack("<II", message_type, len(payload)) + payload
+    payload = struct.pack("<II", message_type, len(payload)) + payload
+    payload = encrypt(payload)
+    payload = struct.pack("<HHHHHH", 0, 0, len(payload), 0, 0, 0) + payload
+    return payload
 
-
-def decode_tlv(sock):
-    header = recv_exact(sock, 8)
+def decode_tlv(data):
+    data = decrypt(data[12:])
+    header = data[0:8]
     if header is None:
         return None
 
     message_type, length = struct.unpack("<II", header)
-    payload = recv_exact(sock, length) if length else b""
+    payload = data[8:]
     if payload is None:
         return None
 
     return message_type, payload
 
-def encrypt_payload(payload):
-    # Placeholder for encryption logic
-    return payload
+
+'''
+I used Gemini to write this implementation of AES CBC-mode
+'''
+def encrypt(payload):
+    with open(keyFile, 'rb') as f:
+        key = f.readlines()[0][-32:]
+    cipher = AES.new(key, AES.MODE_CBC, IV)
+    padded_data = pad(payload, AES.block_size)
+    return cipher.encrypt(padded_data)
+
+
+def decrypt(payload):
+    with open(keyFile, 'rb') as f:
+        key = f.readlines()[0][-32:]
+    cipher = AES.new(key, AES.MODE_CBC, IV)
+    decrypted_padded_data = cipher.decrypt(payload)
+    return unpad(decrypted_padded_data, AES.block_size)

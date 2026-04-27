@@ -11,13 +11,13 @@
 #include "exports.h"
 #include "security.h"
 
-#define WCHAR_NULL_TERMINATOR_COUNT 1U
+#define WCHAR_NULL_TERMINATOR_COUNT           1U
 #define DOMAIN_SEPARATOR_AND_TERMINATOR_COUNT 2U
-#define TOKEN_FIELD_FALSE 0U
-#define TOKEN_FIELD_TRUE 1U
-#define PRIVILEGE_NAME_BUFFER_SIZE 256
-#define LS_FLAG_DIRECTORY 1U
-#define LS_FLAG_FILE      0U
+#define TOKEN_FIELD_FALSE                     0U
+#define TOKEN_FIELD_TRUE                      1U
+#define PRIVILEGE_NAME_BUFFER_SIZE            256
+#define LS_FLAG_DIRECTORY                     1U
+#define LS_FLAG_FILE                          0U
 
 static DWORD BuildTokenSummaryResponseFromToken(
 	HANDLE tokenHandle,
@@ -429,7 +429,7 @@ DWORD BuildTokenPrivilegesResponse(
 	PTOKEN_PRIVILEGES tokenPrivileges = NULL;
 	DWORD returnLength = 0;
 	DWORD i = 0;
-	DWORD finalLength = 0;
+	DWORD finalLength = sizeof(DWORD) + sizeof(DWORD);
 	PBYTE finalBuffer = NULL;
 	DWORD offset = 0;
 	DWORD validCount = 0;
@@ -478,8 +478,6 @@ DWORD BuildTokenPrivilegesResponse(
 		status = ERROR_GET_TOKEN_INFORMATION_FAILED;
 		goto cleanup;
 	}
-
-	finalLength = sizeof(DWORD) + sizeof(DWORD);
 
 	for (i = 0; i < tokenPrivileges->PrivilegeCount; i++)
 	{
@@ -1259,4 +1257,95 @@ cleanup:
 	}
 
 	return status;
+}
+
+// same as EnableCurrentTokenPrivilege but sets Attributes to 0 (disabled)
+DWORD DisableCurrentTokenPrivilege(
+	PCWSTR privilegeName,
+	PBYTE* responseData,
+	DWORD* responseLen
+)
+{
+	LUID luid = { 0 };
+	TOKEN_PRIVILEGES tp = { 0 };
+	DWORD status = NO_ERROR;
+	PBYTE finalBuffer = NULL;
+	DWORD finalLength = 0;
+	DWORD nameBytes = 0;
+	HANDLE tokenHandle = NULL;
+
+	ASSERT(responseData != NULL);
+	ASSERT(responseLen != NULL);
+
+	*responseData = NULL;
+	*responseLen = 0;
+
+	if (!OpenProcessToken(
+		GetCurrentProcess(),
+		TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+		&tokenHandle))
+	{
+		status = ERROR_OPEN_PROCESS_TOKEN_FAILED;
+		goto cleanup;
+	}
+
+	if (!LookupPrivilegeValueW(NULL, privilegeName, &luid))
+	{
+		status = ERROR_LOOKUP_PRIVILEGE_VALUE_FAILED;
+		goto cleanup;
+	}
+
+	tp.PrivilegeCount = 1;
+	tp.Privileges[0].Luid = luid;
+	tp.Privileges[0].Attributes = 0; // 0 = disabled
+
+	if (!AdjustTokenPrivileges(
+		tokenHandle,
+		FALSE,
+		&tp,
+		sizeof(TOKEN_PRIVILEGES),
+		NULL,
+		NULL))
+	{
+		status = ERROR_ADJUST_TOKEN_PRIVILEGES_FAILED;
+		goto cleanup;
+	}
+
+	nameBytes = (DWORD)((wcslen(privilegeName) + 1) * sizeof(WCHAR));
+	finalLength = sizeof(DWORD) + nameBytes;
+
+	finalBuffer = (PBYTE)ImplantHeapAlloc(finalLength);
+	if (finalBuffer == NULL)
+	{
+		status = ERROR_MEMORY_ALLOCATION_FAILED;
+		goto cleanup;
+	}
+
+	*(DWORD*)finalBuffer = status;
+	CopyMemory(finalBuffer + sizeof(DWORD), privilegeName, nameBytes);
+
+	*responseData = finalBuffer;
+	*responseLen = finalLength;
+	finalBuffer = NULL;
+
+cleanup:
+	if (tokenHandle != NULL)
+	{
+		CloseHandle(tokenHandle);
+	}
+	if (finalBuffer != NULL)
+	{
+		ImplantHeapFree(finalBuffer);
+	}
+
+	return status;
+}
+
+// g_PollIntervalMs is declared volatile in exports.c and read by the polling loop
+// CmdSleep calls this to update the interval without touching exports.c directly
+extern volatile DWORD g_PollIntervalMs;
+
+VOID SetPollInterval(DWORD intervalMs)
+{
+	g_PollIntervalMs = intervalMs;
 }

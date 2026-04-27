@@ -65,6 +65,8 @@ DWORD BuildTokenPrivilegesResponse(
  * @brief Attempts to impersonate the token of a target process.
  *
  * @param processId The target process identifier.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
  *
  * @return A numeric error or success code.
  */
@@ -74,10 +76,26 @@ DWORD ImpersonateProcessToken(DWORD processId, PBYTE* responseData, DWORD* respo
  * @brief Attempts to enable a privilege on the current process token.
  *
  * @param privilegeName The privilege name to enable.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
  *
  * @return A numeric error or success code.
  */
 DWORD EnableCurrentTokenPrivilege(PCWSTR privilegeName, PBYTE* responseData, DWORD* responseLen);
+
+/**
+ * @brief Attempts to disable a privilege on the current process token.
+ *
+ * Uses the same wire format as EnableCurrentTokenPrivilege but sets the
+ * privilege attribute to zero rather than SE_PRIVILEGE_ENABLED.
+ *
+ * @param privilegeName The privilege name to disable.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
+DWORD DisableCurrentTokenPrivilege(PCWSTR privilegeName, PBYTE* responseData, DWORD* responseLen);
 
 /**
  * @brief Lists the contents of a directory at the given path.
@@ -150,15 +168,31 @@ DWORD BuildCurrentUserResponse(
  *
  * @return A numeric error or success code.
  */
-
 DWORD GetEnvironmentBlock(
 	PBYTE* responseData,
 	DWORD* responseLen
 );
 
-
+/**
+ * @brief Executes a command via cmd.exe and returns the output and exit code.
+ *
+ * @param cmdLine Null-terminated UTF-16LE command line to execute.
+ * @param responseData Receives an optional heap-allocated response buffer.
+ * @param responseLen Receives the response buffer length in bytes.
+ *
+ * @return A numeric error or success code.
+ */
 DWORD ExecCommand(
 	PCWSTR cmdLine,
 	PBYTE* responseData,
 	DWORD* responseLen
 );
+
+/**
+ * @brief Updates the implant polling interval used by the main loop.
+ *
+ * @param intervalMs The new polling interval in milliseconds.
+ *
+ * @return VOID
+ */
+VOID SetPollInterval(DWORD intervalMs);
